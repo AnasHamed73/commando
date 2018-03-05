@@ -1,0 +1,102 @@
+#!/bin/bash
+#Utilizes pkill with the additional capabilities of interactivity, printing the killed processes' names, and interpreting multiple regular expressions 
+#Date: 1 March 2018
+
+######CONSTANTS
+
+#####FUNCTIONS
+
+usage() {
+	echo "pkill: Utilizes pkill with the additional capabilities of interactivity, printing the killed processes' names, and interpreting multiple regular expressions"
+	echo -e "\nUsage: pkill [OPTION...] [REGEX...]"
+	echo -e "\t[OPTION] is:"
+	echo -e "\t\t-9: send a SIGKILL signal that guarantees the processes' death"
+	echo -e "\t\t-i: interactively choose the matched processes to kill"
+	echo -e "\t[REGEX...]: one or multiple regexes to be interpreted to match the processes to kill"
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+interactive="false"
+
+while [ ! -z $(grep -- "-" <<< "$1") ]; do
+  case "$1" in
+  				"--help")
+  							usage
+  							exit 0
+  							;;
+  				"-i")
+  							interactive="true"
+  							shift
+  							;;
+  				"-9")
+  							sigkill="true"
+  							shift
+  							;;
+					"--")
+								shift
+								break
+								;;
+					*)
+								shift
+								;;
+  esac
+done
+
+while [ ! -z "$1" ]; do
+
+		pids=()
+		names=()
+
+		#gather process ids
+		for i in $(pgrep -af -- "$1" | cut -d ' ' -f 1); do
+			   count=${#pids[@]}
+			   pids[$count]="$i"
+  	done
+
+		#gather process names
+		for i in $(pgrep -af -- "$1" | cut -d ' ' -f 2); do
+			   count=${#names[@]}
+			   names[$count]="$i"
+		done
+
+		count="${#pids[@]}"
+		count=$((count-2))
+
+		echo "found $count matches for $1:" | grep -- "$1"
+
+		for (( i=0; i<count; i++ )); do
+		    choice=
+
+				if [ "$interactive" == "true" ]; then 
+					while [ "$choice" != "y" -a "$choice" != "Y" -a "$choice" != "n" -a "$choice" != "N" ]; do
+						read -p "kill ${names[i]}? (y/n): " choice
+					done
+					if [ "$choice" == "n" -o "$choice" == "N" ]; then 
+						continue;
+					fi
+			  fi
+
+				if [ "$sigkill" == "true" ]; then
+					kill -9 ${pids[i]} 
+					echo "killed: ${names[i]}" | grep --color=auto ${names[i]}
+				else
+					kill ${pids[i]} 2&>1 1>/dev/null
+					echo -n "kill attempted: ${names[i]} " 
+					sleep 0.05
+					kill -0 ${pids[i]} 2&>1  1>/dev/null
+					case $? in 
+						0) echo "-> Kill Failed" ;;
+						1) echo "-> Kill Succeeded" ;;
+      		esac
+				fi
+		done
+
+	  shift
+done

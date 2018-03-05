@@ -1,0 +1,93 @@
+#!/bin/bash
+
+######CONSTANTS
+
+SCRIPT_DIR="$HOME/bin"
+
+######FUNCTIONS
+
+clean_up() {
+  exit 0
+}
+
+usage() {
+				echo "$(basename $0): create a new script under the default script directory ($SCRIPT_DIR) using a conventional template"
+	echo -e "\nUsage: nsc [NAME]"
+	echo "	[NAME]: name of the script"
+}
+
+create_script() {
+	touch $1
+	chmod 755 $1
+}
+
+cat_template() {
+	echo -e "#!/bin/bash
+#$1
+#Created on $(date +"%e %B %Y")
+
+######CONSTANTS
+
+#####FUNCTIONS
+
+usage() {
+	echo \"$1: (description)\"
+	echo -e \"\\\nUsage: $1\"
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case \"\$1\" in
+	\"--help\")
+					usage 
+					exit 0
+					;;
+esac
+
+echo \"unimplemented\"
+	"
+}	
+
+open_editor() {
+	vim $1
+}	
+
+######MAIN
+
+trap clean_up SIGINT SIGHUP SIGTERM
+
+if [ "$1" == "--help" ]; then
+    usage
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+	echo "please specify the script's name"
+	exit 1
+fi
+
+if [ -f "$SCRIPT_DIR/$1" ]; then
+		while [ "$REPLY" != "y" -a "$REPLY" != "Y" -a "$REPLY" != "n" -a "$REPLY" != "n" ]; do
+				read -p "\"$1\" already exists in $SCRIPT_DIR; replace? (y/n): "
+		done
+fi
+
+if [ "$REPLY" == "n" -o "$REPLY" == "N" ]; then
+	exit 0
+fi
+
+script="$SCRIPT_DIR/$1"
+
+create_script $script
+
+cat_template $1 > $script
+
+open_editor $script
+
+echo done
