@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #Utilizes pkill with the additional capabilities of interactivity, printing the killed processes' names, and interpreting multiple regular expressions 
 #Date: 1 March 2018

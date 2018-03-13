@@ -1,0 +1,52 @@
+#!/bin/bash
+#bkup:bkup: Perform a backup of the given file/directory on the same hierarchy level
+#Created on 12 March 2018
+
+######CONSTANTS
+
+#####FUNCTIONS
+
+usage() {
+	echo "bkup: Perform a backup of the given file/directory on the same hierarchy level"
+	echo -e "\nUsage: bkup [DIR]..."
+	echo -e "\n\t[DIR]: the directory (or directories) for which a backup is to be made"
+}
+
+clean_up() {
+	exit 0
+}
+
+sync_dir() {
+	rsync -av "$1"/* "$1".bak
+}
+
+sync_file() {
+	rsync -av "$1" "$1".bak
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+	"--help"|"")
+					usage 
+					exit 0
+					;;
+esac
+
+while [ ! -z "$1" ]; do
+	if [ -f "$1" ]; then
+    sync_file "$1"
+	elif [ "$1" == "." ]; then
+		sync_dir $(pwd)
+	elif [ "$1" == ".." ]; then
+		cd .. && sync_dir $(pwd)
+	elif [ -d "$1" ]; then
+		sync_dir "$1"
+  else
+		echo "file/directory $1 does not exist"
+	fi
+
+	shift
+done
