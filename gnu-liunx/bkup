@@ -8,8 +8,10 @@
 
 usage() {
 	echo "bkup: Perform a backup of the given file/directory on the same hierarchy level"
-	echo -e "\nUsage: bkup [DIR]..."
+	echo -e "\nUsage: bkup [OPTION] [DIR]..."
 	echo -e "\n\t[DIR]: the directory (or directories) for which a backup is to be made"
+	echo -e "\t[OPTION] is:"
+	echo -e "\t  -c|--compress: compress the file/directory to a tar.gz file" 
 }
 
 clean_up() {
@@ -17,33 +19,44 @@ clean_up() {
 }
 
 sync_dir() {
-	rsync -av "$1"/* "$1".bak
+	dir=$(basename $1)
+	[ -z "$(ls $1)" ] && mkdir ${dir}.bak || rsync -av $1/* $1.bak
 }
 
 sync_file() {
 	rsync -av "$1" "$1".bak
 }
 
+compress() {
+  tar -zcvf "$1.tar.gz" "$1" 
+}
+
 ######MAIN
 
 trap clean_up SIGINT SIGTERM SIGHUP
 
+compress=
 case "$1" in
 	"--help"|"")
 					usage 
 					exit 0
 					;;
+	"-c"|"--compress")
+			    compress="true"	 
+					shift
+					;;
 esac
 
 while [ ! -z "$1" ]; do
+
 	if [ -f "$1" ]; then
-    sync_file "$1"
+		[ "$compress" == "true" ] && compress "$1" || sync_file "$1"
 	elif [ "$1" == "." ]; then
-		sync_dir $(pwd)
+					[ "$compress" == "true" ] && compress "$(pwd)" || sync_dir "$(pwd)"
 	elif [ "$1" == ".." ]; then
-		cd .. && sync_dir $(pwd)
+					 cd .. && { [ "$compress" == "true" ] && compress "$(pwd)" || sync_dir $(pwd); };
 	elif [ -d "$1" ]; then
-		sync_dir "$1"
+					{ [ "$compress" == "true" ] && compress "$1"; } || sync_dir "$1"
   else
 		echo "file/directory $1 does not exist"
 	fi
