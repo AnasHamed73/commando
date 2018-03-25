@@ -68,7 +68,6 @@ while [ ! -z "$1" ]; do
 		done
 
 		count="${#pids[@]}"
-	#	count=$((count-2))
 
 		echo "found $count matches for $1:" | grep -- "$1"
 
