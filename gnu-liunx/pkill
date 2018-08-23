@@ -84,13 +84,13 @@ while [ ! -z "$1" ]; do
 			  fi
 
 				if [ "$sigkill" == "true" ]; then
-					kill -9 ${pids[i]} 
+					kill -9 ${pids[i]} 2>&1 1>/dev/null
 					echo "killed: ${names[i]}" | grep --color=auto ${names[i]}
 				else
-					kill ${pids[i]} 2&>1 1>/dev/null
+					kill ${pids[i]} &>/dev/null
 					echo -n "kill attempted: ${names[i]} " 
 					sleep 0.05
-					kill -0 ${pids[i]} 2&>1 1>/dev/null
+					kill -0 ${pids[i]} &>/dev/null
 					case $? in 
 						0) echo "-> Kill Failed" ;;
 						1) echo "-> Kill Succeeded" ;;
