@@ -1,6 +1,6 @@
 alias resnet='sudo service network-manager restart'
 
-alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
+#alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
 alias vi='vim'
 alias files='xdg-open . &'
 alias idea='/usr/share/idea/idea-IC-183.5912.21/bin &'
@@ -13,5 +13,6 @@ alias mtlssh='ssh ahamed@metallica.cse.buffalo.edu'
 alias tmbsync='_f(){ rsync -avr $1 ahamed@timberlake.cse.buffalo.edu:/home/csgrad/ahamed; }; _f '
 alias tmbssh='ssh ahamed@timberlake.cse.buffalo.edu'
 
+alias syncvm='scp -P 3022 -r seed@127.0.0.1:/home/seed/Desktop/src .'
 alias cpy='xclip -selection c -silent'
 alias pst='xclip -selection c -o'
