@@ -41,7 +41,12 @@ if [ -z "$2" ]; then
 	exit 1
 fi
 
-match=$(find $dname -type f -iwholename "*${1}*" | head -n 1)
+
+if [ ! -z $(echo "$1" | grep "/") ]; then
+  match=$(find $dname -type f -iwholename "*${1}*" | head -n 1)
+else
+  match=$(find . -maxdepth 1 -type f -iwholename "*${1}*" | head -n 1)
+fi
 
 #echo "match: $match" 
 if [ -z "$match" ]; then
@@ -53,9 +58,13 @@ match=${match//\.\//}
 dname=$(dirname $match)
 
 temp=$(echo "$(basename $match)" | sed "s/\./${placeholder}/")
-extension=$(echo "$temp" | cut -d ${placeholder} -f 2)
+if [ ! -z $(echo "$temp" | grep "$placeholder") ]; then
+  extension=".$(echo "$temp" | cut -d ${placeholder} -f 2)"
+else
+	extension=""
+fi
 
-#echo "extension: $extension"
+echo "extension: $extension"
 #echo "dirname: $dname"
 if [ "$dname" != "." ]; then
 	dname="${dname}/"
@@ -63,5 +72,5 @@ else
 	dname=""
 fi
 
-echo "renaming ${match} to ${dname}${2}.${extension}"
-mv -i "${match}" "${dname}${2}.${extension}"
+echo "renaming ${match} to ${dname}${2}${extension}"
+mv -i "${match}" "${dname}${2}${extension}"
