@@ -1,0 +1,67 @@
+#!/bin/bash
+#rnm: rename a file without specifying the file extension
+#Created on  6 December 2019
+
+######CONSTANTS
+
+placeholder="!"
+
+#####FUNCTIONS
+
+usage() {
+	echo "rnm: rename a file without specifying the file extension. The extension is appended to the new file name."
+	echo -e "\nUsage: rnm [FILE_REGEX] [NEW_NAME]"
+	echo -e "\n\n[FILE_REGEX]: a regex on which to look for the file. The first match is taken."
+	echo -e "\n[NEW_NAME]: the new file name without the extension"
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+if [ -z "$1" ]; then
+	echo "please specify a regex that captures the file name."
+	exit 1
+fi
+
+
+if [ -z "$2" ]; then
+	echo "please specify the new file name (without the extension)."
+	exit 1
+fi
+
+match=$(find $dname -type f -iwholename "*${1}*" | head -n 1)
+
+#echo "match: $match" 
+if [ -z "$match" ]; then
+	echo "no matches found for $1"
+	exit 1
+fi
+
+match=${match//\.\//}
+dname=$(dirname $match)
+
+temp=$(echo "$(basename $match)" | sed "s/\./${placeholder}/")
+extension=$(echo "$temp" | cut -d ${placeholder} -f 2)
+
+#echo "extension: $extension"
+#echo "dirname: $dname"
+if [ "$dname" != "." ]; then
+	dname="${dname}/"
+else
+	dname=""
+fi
+
+echo "renaming ${match} to ${dname}${2}.${extension}"
+mv -i "${match}" "${dname}${2}.${extension}"
