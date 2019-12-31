@@ -1,0 +1,48 @@
+#!/bin/bash
+#tosc: renames the specified file to a snake-case file naming convention
+#Created on  6 December 2019
+
+######CONSTANTS
+
+to_sc_script="./rnmsc.py"
+
+#####FUNCTIONS
+
+usage() {
+	echo "tosc: renames the specified file to a snake-case file naming convention"
+	echo -e "\nUsage: tosc [FILE]"
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+if [ -z "$1" ]; then
+	echo "please specify file name"
+	exit 1
+fi
+
+#if [ ! -e "$1" ]; then
+#	echo "file $1 does not exist"
+#	exit 1
+#fi
+
+#sc=$(./$to_sc_script $1)
+#echo $sc
+
+
+rnm="$(echo $* | sed -e 's/\([A-Z]\)\([a-z]\)/-\l\1\2/g' -e 's/\([A-Z]\)\{2,\}/-\L&/g' -e 's/^-\(.*\)/\1/' -e 's/\([A-Z]\)/\L\1/g' -e 's/\([A-Z][a-z]\)/-\L\1/g' -e 's/ /-/g' -e 's/\.-/\./g')"
+#rnm="$(echo $* | sed 's/ /-/g' | sed  -e 's/\([A-Z][a-z]\)/-\L\1/g' | sed 's/\([A-Z]\)/\L\1/g' | sed 's/ /-/g' | sed 's/-\{2,\}/-/' | sed 's/^-//' | sed 's/$-//')"
+
+echo $rnm
