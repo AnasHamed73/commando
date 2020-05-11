@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#mkpy: creates an empty python executable, changes the permissions to make the file executable, and adds the shebang so that using an explicit interpreter is unnecessary
+#Created on 9 July 2019
+
+######CONSTANTS
+
+#####FUNCTIONS
+
+usage() {
+	echo "mkpy: creates an empty python executable in the current directory by default, changes the permissions to make the file executable, and adds the shebang so that using an explicit interpreter is unnecessary"
+	echo -e "\nUsage: mkpy [FILENAME]\n\n"
+	echo -e "FILENAME: the name or full path of the file (without the .py suffix)\n"
+}
+
+cat_template() {
+	echo -e "#!/usr/bin/env python
+
+##### MAIN
+
+"
+}	
+
+create_script() {
+	touch $1
+	chmod 755 $1
+}
+
+open_editor() {
+  vim $1
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+if [ "$1" == "--help" ]; then
+    usage
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+	echo "please specify the script's name"
+	exit 1
+fi
+
+if [ -f "$1" -o -f "${1}.py" ]; then
+		while [ "$REPLY" != "y" -a "$REPLY" != "Y" -a "$REPLY" != "n" -a "$REPLY" != "n" ]; do
+			read -p "\"${1}.py\" already exists; replace? (y/n): "
+		done
+fi
+
+if [ "$REPLY" == "n" -o "$REPLY" == "N" ]; then
+	exit 0
+fi
+
+script="${1//.py/}.py"
+
+create_script $script
+
+cat_template > $script
+
+open_editor $script
+

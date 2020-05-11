@@ -73,7 +73,7 @@ if [ -z "$1" ]; then
 fi
 
 if [ -f "$SCRIPT_DIR/$1" ]; then
-		while [ "$REPLY" != "y" -a "$REPLY" != "Y" -a "$REPLY" != "n" -a "$REPLY" != "n" ]; do
+		while [ "$REPLY" != "y" -a "$REPLY" != "Y" -a "$REPLY" != "n" -a "$REPLY" != "N" ]; do
 				read -p "\"$1\" already exists in $SCRIPT_DIR; replace? (y/n): "
 		done
 fi
