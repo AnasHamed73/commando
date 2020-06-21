@@ -39,7 +39,18 @@ alias gcpstop='gcloud compute instances stop "$GCP_INSTANCE_NAME" --zone "$GCP_I
 alias gcpstatus='gcloud compute instances list'
 alias gcpexec="gcloud compute ssh "$GCP_INSTANCE_NAME" --zone "$GCP_INSTANCE_ZONE" --command "
 
+# HEROKU
+HEROKU_APP_NAME="portfolio-anas"
+HEROKU_DB_USER="mydb"
+HEROKU_DB_PASSWD="mypass"
+alias herokubash="heroku run bash -a $HEROKU_APP_NAME"
+alias herokulogs="heroku logs --tail -a $HEROKU_APP_NAME"
+alias herokucredit="heroku ps -a $HEROKU_APP_NAME"
+alias herokupushdb="PGUSER=$HEROKU_DB_USER PGPASSWORD=$HEROKU_DB_PASSWD heroku pg:push postgres://localhost/pfdb postgresql-curly-51366 -a $HEROKU_APP_NAME"
+alias herokuresetdb='heroku pg:reset -a $HEROKU_APP_NAME'
+
+alias ganache='/home/kikuchio/Downloads/installers/ganache-2.1.1-linux-x86_64.AppImage &> /dev/null &'
+
 alias cpy='xclip -selection c -silent'
 alias pst='xclip -selection c -o'
-# counts the number of lines in all the files in the current directory
 alias lswc='for i in $(find . -maxdepth 1 ! -name . -prune -type d -printf "%f\n" ); do echo -ne "${i}: "; ls $i | wc -l; done'
