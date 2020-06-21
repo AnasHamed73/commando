@@ -4,13 +4,11 @@
 
 ######CONSTANTS
 
-to_sc_script="./rnmsc.py"
-
 #####FUNCTIONS
 
 usage() {
-	echo "tosc: renames the specified file to a snake-case file naming convention"
-	echo -e "\nUsage: tosc [FILE]"
+	echo "tosc: converts the given arg to a snake-case"
+	echo -e "\nUsage: tosc [STRING]"
 }
 
 clean_up() {
@@ -29,20 +27,10 @@ case "$1" in
 esac
 
 if [ -z "$1" ]; then
-	echo "please specify file name"
+	echo "please specify the string to convert"
 	exit 1
 fi
 
-#if [ ! -e "$1" ]; then
-#	echo "file $1 does not exist"
-#	exit 1
-#fi
-
-#sc=$(./$to_sc_script $1)
-#echo $sc
-
-
 rnm="$(echo $* | sed -e 's/\([A-Z]\)\([a-z]\)/-\l\1\2/g' -e 's/\([A-Z]\)\{2,\}/-\L&/g' -e 's/^-\(.*\)/\1/' -e 's/\([A-Z]\)/\L\1/g' -e 's/\([A-Z][a-z]\)/-\L\1/g' -e 's/ /-/g' -e 's/\.-/\./g' -e 's/-\{2,\}/-/g')"
-#rnm="$(echo $* | sed 's/ /-/g' | sed  -e 's/\([A-Z][a-z]\)/-\L\1/g' | sed 's/\([A-Z]\)/\L\1/g' | sed 's/ /-/g' | sed 's/-\{2,\}/-/' | sed 's/^-//' | sed 's/$-//')"
 
 echo $rnm

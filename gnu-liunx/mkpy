@@ -9,11 +9,29 @@
 
 usage() {
 	echo "mkpy: creates an empty python executable in the current directory by default, changes the permissions to make the file executable, and adds the shebang so that using an explicit interpreter is unnecessary"
-	echo -e "\nUsage: mkpy [FILENAME]\n\n"
+	echo -e "\nUsage: mkpy [OPTION] [FILENAME]\n\n"
 	echo -e "FILENAME: the name or full path of the file (without the .py suffix)\n"
+	echo -e "OPTION is one of:\n"
+	echo -e "\t-a|--args: include boilerplate code to check if script is being run as main and receive args\n"
 }
 
-cat_template() {
+
+cat_template_args() {
+	echo -e "#!/usr/bin/env python
+
+import argparse
+
+##### MAIN
+
+if __name__ == \"__main__\":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(\"-a\", \"--arg1\", help=\"help field for this option\")
+    args = parser.parse_args()
+
+"
+}	
+
+cat_template_noargs() {
 	echo -e "#!/usr/bin/env python
 
 ##### MAIN
@@ -38,6 +56,8 @@ clean_up() {
 
 trap clean_up SIGINT SIGTERM SIGHUP
 
+inc_args='n'
+
 if [ "$1" == "--help" ]; then
     usage
     exit 0
@@ -46,6 +66,11 @@ fi
 if [ -z "$1" ]; then
 	echo "please specify the script's name"
 	exit 1
+fi
+
+if [ "$1" == "-a" -o "$1" == "--args" ]; then
+	inc_args='y'
+	shift
 fi
 
 if [ -f "$1" -o -f "${1}.py" ]; then
@@ -62,7 +87,11 @@ script="${1//.py/}.py"
 
 create_script $script
 
-cat_template > $script
+if [ "$inc_args" == "y" ]; then
+  cat_template_args > $script
+else
+  cat_template_noargs > $script
+fi
 
 open_editor $script
 
