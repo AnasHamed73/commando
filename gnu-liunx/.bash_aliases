@@ -51,6 +51,6 @@ alias herokuresetdb='heroku pg:reset -a $HEROKU_APP_NAME'
 
 alias ganache='/home/kikuchio/Downloads/installers/ganache-2.1.1-linux-x86_64.AppImage &> /dev/null &'
 
-alias cpy='xclip -selection c -silent'
+alias cpy='xargs echo -n | xclip -selection c -silent'
 alias pst='xclip -selection c -o'
 alias lswc='for i in $(find . -maxdepth 1 ! -name . -prune -type d -printf "%f\n" ); do echo -ne "${i}: "; ls $i | wc -l; done'
