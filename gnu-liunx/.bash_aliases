@@ -18,6 +18,11 @@ alias pycharm='/usr/share/pycharm/pycharm-community-2018.3.4/bin/pycharm.sh &'
 alias chrome='_f(){ google-chrome-stable -U ${1} &>/dev/null; }; _f '
 alias xo='open_all '
 
+# GIT
+# fetches a list of the names of the files that were updated in the
+# provided commit hash
+alias gitcf='git diff-tree --no-commit-id --name-only -r '
+
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
 alias sprssh='ssh ahamed@springsteen.cse.buffalo.edu'
