@@ -22,6 +22,45 @@ alias xo='open_all '
 # fetches a list of the names of the files that were updated in the
 # provided commit hash
 alias gitcf='git diff-tree --no-commit-id --name-only -r '
+# lists all remote branches
+alias gitbr='git branch -r'
+# discard all local commits and make branch identical to upstream
+alias gitrst='git reset --hard @{u}'
+# show all commits on current branch one by one
+alias gitshow='echo "q to quit, any other key to continue"; for i in $(git log --oneline | cut -f1 -d" "); do git show --color=always $i | less -R; read; if [ "$REPLY" == "q" ]; then break; fi; done'
+
+# MEZ
+rsync_send() {
+	hostname="$1"; shift
+	rsync -avr --progress $* ${hostname}:/home/ubuntu/airport
+}
+rsync_get() {
+	hostname="$1"; shift
+  rsync -avr --progress ${hostname}:/home/ubuntu/$1 .
+}
+sshp() {
+	ssh_host=$1
+}
+alias commitmez='_f(){ git commit -m "MEZ-${1}, MEZ-${2} - ${3}"; }; _f '
+#ssh_host="ec2"
+#ssh_host="biggerguns"
+#ssh_host="bigguns"
+ssh_host="mezdev"
+alias sshmez="ssh $ssh_host"
+alias sendmez="rsync_send $ssh_host "
+alias fetchmez="rsync_get $ssh_host "
+
+cookies_file="./cookie_vals.txt"
+primsg() {
+  curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"userId\": \"5e3b319688eb61114b5d10b5\", \"message\":\"$1\"}" 'http://localhost:4000/messages/private'
+}
+groupmsg() {
+  curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"message\":\"$1\"}" 'http://localhost:4000/messages/all'
+}
+  # Potree
+alias makec='cd /home/anas/src/potree/PotreeConverter/master/build && make && cd /home/anas/src/potree/PotreeConverter/master/Converter/src'
+alias rlas='/home/anas/src/potree/PotreeConverter/master/build/PotreeConverter -i /home/anas/src/potree/input/aligned.las -o /home/anas/src/potree/PotreeConverter/master/build/out/'
+alias rply='/home/anas/src/potree/PotreeConverter/master/build/PotreeConverter -i /home/anas/src/potree/input/aligned.ply -o /home/anas/src/potree/PotreeConverter/master/build/out/'
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
