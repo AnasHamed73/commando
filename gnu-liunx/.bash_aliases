@@ -23,23 +23,28 @@ alias xo='open_all '
 # provided commit hash
 alias gitcf='git diff-tree --no-commit-id --name-only -r '
 # lists all remote branches
-alias gitbr='git branch -r'
+alias gitbr='git remote show origin'
 # discard all local commits and make branch identical to upstream
 alias gitrst='git reset --hard @{u}'
 # show all commits on current branch one by one
 alias gitshow='echo "q to quit, any other key to continue"; for i in $(git log --oneline | cut -f1 -d" "); do git show --color=always $i | less -R; read; if [ "$REPLY" == "q" ]; then break; fi; done'
+# shows branch hierarchy in a tree-like structure
+alias gitlog='git log --graph --pretty=oneline --abbrev-commit'
+# removes stale local branches that have been removed in remote
+alias gitpl='git branch -r | awk '"'"'{print $1}'"'"' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '"'"'{print $1}'"'"' | xargs git branch -d'
+
 
 # MEZ
 rsync_send() {
-	hostname="$1"; shift
-	rsync -avr --progress $* ${hostname}:/home/ubuntu/airport
+  hostname="$1"; shift
+  rsync -avr --progress $* ${hostname}:/home/ubuntu/airport
 }
 rsync_get() {
-	hostname="$1"; shift
+  hostname="$1"; shift
   rsync -avr --progress ${hostname}:/home/ubuntu/$1 .
 }
 sshp() {
-	ssh_host=$1
+  ssh_host=$1
 }
 alias commitmez='_f(){ git commit -m "MEZ-${1}, MEZ-${2} - ${3}"; }; _f '
 #ssh_host="ec2"
