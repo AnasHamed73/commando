@@ -30,8 +30,12 @@ alias gitrst='git reset --hard @{u}'
 alias gitshow='echo "q to quit, any other key to continue"; for i in $(git log --oneline | cut -f1 -d" "); do git show --color=always $i | less -R; read; if [ "$REPLY" == "q" ]; then break; fi; done'
 # shows branch hierarchy in a tree-like structure
 alias gitlog='git log --graph --pretty=oneline --abbrev-commit'
+# git log --oneline + author and date
+alias gitlo='git log --color --pretty=format:"%C(Yellow)%h%Creset  %<(12,trunc)%an %C(Cyan)%<(30,trunc)%ad%Creset %s"'
 # removes stale local branches that have been removed in remote
 alias gitpl='git branch -r | awk '"'"'{print $1}'"'"' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '"'"'{print $1}'"'"' | xargs git branch -d'
+alias gitst='git status'
+alias gitdh='git diff HEAD '
 
 
 # MEZ
