@@ -9,6 +9,20 @@ function open_all() {
 	done
 }
 
+function gitfollow() {
+	file_path="$1"
+	succ=HEAD
+	first=y
+  echo "q to quit, any other key to continue"
+	for commit in $(git log --oneline --follow -- $file_path | cut -f1 -d' '); do
+		[ $first == 'y' ] && first=n && continue
+		git diff --color=always ${succ}:${file_path} ${commit}:${file_path} | less -R
+		succ=$commit
+    read; if [ "$REPLY" == "q" ]; then break; fi
+	done
+
+}
+
 #alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
 alias vi='vim'
 alias files='xdg-open . &>/dev/null &'
@@ -36,6 +50,8 @@ alias gitlo='git log --color --pretty=format:"%C(Yellow)%h%Creset  %<(12,trunc)%
 alias gitpl='git branch -r | awk '"'"'{print $1}'"'"' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '"'"'{print $1}'"'"' | xargs git branch -d'
 alias gitst='git status'
 alias gitdh='git diff HEAD '
+# select a specific file from stash to be applied
+alias gitpsf='git checkout stash@{0} -- '
 
 
 # MEZ
