@@ -16,7 +16,7 @@ function gitfollow() {
   echo "q to quit, any other key to continue"
 	for commit in $(git log --oneline --follow -- $file_path | cut -f1 -d' '); do
 		[ $first == 'y' ] && first=n && continue
-		git diff --color=always ${succ}:${file_path} ${commit}:${file_path} | less -R
+		git diff --color=always ${commit}:${file_path} ${succ}:${file_path} | less -R
 		succ=$commit
     read; if [ "$REPLY" == "q" ]; then break; fi
 	done
