@@ -9,20 +9,6 @@ function open_all() {
 	done
 }
 
-function gitfollow() {
-	file_path="$1"
-	succ=HEAD
-	first=y
-  echo "q to quit, any other key to continue"
-	for commit in $(git log --oneline --follow -- $file_path | cut -f1 -d' '); do
-		[ $first == 'y' ] && first=n && continue
-		git diff --color=always ${commit}:${file_path} ${succ}:${file_path} | less -R
-		succ=$commit
-    read; if [ "$REPLY" == "q" ]; then break; fi
-	done
-
-}
-
 #alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
 alias vi='vim'
 alias files='xdg-open . &>/dev/null &'
@@ -47,11 +33,32 @@ alias gitlog='git log --graph --pretty=oneline --abbrev-commit'
 # git log --oneline + author and date
 alias gitlo='git log --color --pretty=format:"%C(Yellow)%h%Creset  %<(12,trunc)%an %C(Cyan)%<(30,trunc)%ad%Creset %s"'
 # removes stale local branches that have been removed in remote
-alias gitpl='git branch -r | awk '"'"'{print $1}'"'"' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '"'"'{print $1}'"'"' | xargs git branch -d'
+alias gitpl='git branch -r | awk '\''{print $1}'\'' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '\''{print $1}'\'' | xargs git branch -d'
 alias gitst='git status'
 alias gitdh='git diff HEAD '
 # select a specific file from stash to be applied
 alias gitpsf='git checkout stash@{0} -- '
+# follow specific file through git history
+function gitfollow() {
+	file_path="$1"
+	succ=HEAD
+	first=y
+  echo "q to quit, any other key to continue"
+	for commit in $(git log --oneline --follow -- $file_path | cut -f1 -d' '); do
+		[ $first == 'y' ] && first=n && continue
+		git diff --color=always ${commit}:${file_path} ${succ}:${file_path} | less -R
+		succ=$commit
+    read; if [ "$REPLY" == "q" ]; then break; fi
+	done
+}
+# track all remote branches in repo locally
+function gitta() {
+	matches=$(git branch -a | grep remote | grep -v HEAD | grep -v master)
+	if [ ! -z "$1" ]; then
+		matches=$(grep -i $1 <<< $matches)
+	fi
+  for i in $matches; do git branch --track ${i#remotes/origin/} $i 2>/dev/null; done
+}
 
 
 # MEZ
