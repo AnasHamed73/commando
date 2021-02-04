@@ -38,6 +38,8 @@ alias gitst='git status'
 alias gitdh='git diff HEAD '
 # select a specific file from stash to be applied
 alias gitpsf='git checkout stash@{0} -- '
+# checkout the first branch that matches the given regex
+alias gitco='_gco() { git checkout $(git branch -r | grep $1 | sed '\''s/origin\///'\''); }; _gco'
 # follow specific file through git history
 function gitfollow() {
 	file_path="$1"
