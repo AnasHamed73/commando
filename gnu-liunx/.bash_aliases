@@ -33,7 +33,7 @@ alias gitlog='git log --graph --pretty=oneline --abbrev-commit'
 # git log --oneline + author and date
 alias gitlo='git log --color --pretty=format:"%C(Yellow)%h%Creset  %<(12,trunc)%an %C(Cyan)%<(30,trunc)%ad%Creset %s"'
 # removes stale local branches that have been removed in remote
-alias gitpl='git branch -r | awk '\''{print $1}'\'' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '\''{print $1}'\'' | xargs git branch -d'
+alias gitpl='git branch -r | awk '\''{print $1}'\'' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '\''{print $1}'\'' | xargs git branch -D'
 alias gitst='git status'
 alias gitdh='git diff HEAD '
 # select a specific file from stash to be applied
@@ -84,7 +84,6 @@ ssh_host="mezdev"
 alias sshmez="ssh $ssh_host"
 alias sendmez="rsync_send $ssh_host "
 alias fetchmez="rsync_get $ssh_host "
-
 cookies_file="./cookie_vals.txt"
 primsg() {
   curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"userId\": \"5e3b319688eb61114b5d10b5\", \"message\":\"$1\"}" 'http://localhost:4000/messages/private'
@@ -92,10 +91,6 @@ primsg() {
 groupmsg() {
   curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"message\":\"$1\"}" 'http://localhost:4000/messages/all'
 }
-  # Potree
-alias makec='cd /home/anas/src/potree/PotreeConverter/master/build && make && cd /home/anas/src/potree/PotreeConverter/master/Converter/src'
-alias rlas='/home/anas/src/potree/PotreeConverter/master/build/PotreeConverter -i /home/anas/src/potree/input/aligned.las -o /home/anas/src/potree/PotreeConverter/master/build/out/'
-alias rply='/home/anas/src/potree/PotreeConverter/master/build/PotreeConverter -i /home/anas/src/potree/input/aligned.ply -o /home/anas/src/potree/PotreeConverter/master/build/out/'
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
@@ -133,3 +128,5 @@ alias ganache='/home/kikuchio/Downloads/installers/ganache-2.1.1-linux-x86_64.Ap
 alias cpy='xargs echo -n | xclip -selection c -silent'
 alias pst='xclip -selection c -o'
 alias lswc='for i in $(find . -maxdepth 1 ! -name . -prune -type d -printf "%f\n" ); do echo -ne "${i}: "; ls $i | wc -l; done'
+alias ppj='python -m json.tool'
+
