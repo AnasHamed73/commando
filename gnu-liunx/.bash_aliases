@@ -38,8 +38,9 @@ alias gitst='git status'
 alias gitdh='git diff HEAD '
 # select a specific file from stash to be applied
 alias gitpsf='git checkout stash@{0} -- '
+alias gitbrregex='_grgx() { git branch -r | grep $1 | sed '\''s/origin\///'\''; }; _grgx'
 # checkout the first branch that matches the given regex
-alias gitco='_gco() { git checkout $(git branch -r | grep $1 | sed '\''s/origin\///'\''); }; _gco'
+alias gitco='_gco() { git checkout $(gitbrregex $1); }; _gco'
 # follow specific file through git history
 function gitfollow() {
 	file_path="$1"
@@ -61,6 +62,19 @@ function gitta() {
 		matches=$(grep -i $1 <<< $matches)
 	fi
   for i in $matches; do git branch --track ${i#remotes/origin/} $i 2>/dev/null; done
+}
+# delete remote branch by regex
+function gitdrb() {
+  match=$(gitbrregex $1)
+	match=${match// /}
+	if [ -z "$match" ]; then
+		echo "no match found for $1"
+		return
+	fi
+	read -p "delete remote branch ${match}? (y/n) "
+	if [ "$REPLY" = "y" ]; then
+		git push -d origin "$match"
+	fi
 }
 
 
