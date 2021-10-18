@@ -65,23 +65,30 @@ function gitta() {
 }
 # delete remote branch by regex
 function gitdrb() {
-  match=$(gitbrregex $1)
-	match=${match// /}
-	if [ -z "$match" ]; then
-		echo "no match found for $1"
-		return
-	fi
-	read -p "delete remote branch ${match}? (y/n) "
-	if [ "$REPLY" = "y" ]; then
-		git push -d origin "$match"
-	fi
+  for ex in $*; do
+    match=$(gitbrregex $ex)
+	  match=${match// /}
+	  if [ -z "$match" ]; then
+	  	echo "no match found for $ex"
+	  	continue
+	  fi
+		IFS=$'\n'
+		for br in $match; do
+	    read -p "delete remote branch ${br}? (y/n) "
+	    if [ "$REPLY" = "y" ]; then
+	    	git push -d origin "$br"
+	    fi
+		done
+	done
 }
 
 
 # MEZ
 rsync_send() {
   hostname="$1"; shift
-  rsync -avr --progress $* ${hostname}:/home/ubuntu/airport
+	for f in "$*"; do
+	  rsync -avr --progress "$f" ${hostname}:/home/ubuntu/wireport/"$f"
+	done
 }
 rsync_get() {
   hostname="$1"; shift
