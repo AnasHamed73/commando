@@ -40,7 +40,7 @@ alias gitdh='git diff HEAD '
 alias gitpsf='git checkout stash@{0} -- '
 alias gitbrregex='_grgx() { git branch -r | grep $1 | sed '\''s/origin\///'\''; }; _grgx'
 # checkout the first branch that matches the given regex
-alias gitco='_gco() { git checkout $(gitbrregex $1); }; _gco'
+alias gitco='_gco() { git checkout $(tr -d '"'"' \t\n\r'"'"' < <(gitbrregex $1)) --; }; _gco'
 # follow specific file through git history
 function gitfollow() {
 	file_path="$1"
