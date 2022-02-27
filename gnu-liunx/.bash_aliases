@@ -12,7 +12,7 @@ function open_all() {
 #alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
 alias vi='vim'
 alias files='xdg-open . &>/dev/null &'
-alias sublime='/opt/sublime_text/sublime_text '
+alias sublime='/snap/bin/sublime-text.subl'
 alias idea='/usr/share/idea/idea-IC-183.5912.21/bin &'
 alias pycharm='/usr/share/pycharm/pycharm-community-2018.3.4/bin/pycharm.sh &'
 alias chrome='_f(){ google-chrome-stable -U ${1} &>/dev/null; }; _f '
@@ -41,6 +41,8 @@ alias gitpsf='git checkout stash@{0} -- '
 alias gitbrregex='_grgx() { git branch -r | grep $1 | sed '\''s/origin\///'\''; }; _grgx'
 # checkout the first branch that matches the given regex
 alias gitco='_gco() { git checkout $(tr -d '"'"' \t\n\r'"'"' < <(gitbrregex $1)) --; }; _gco'
+# merge the first branch that matches the given regex
+alias gitmrg='_gmg() { git merge --no-ff $(tr -d '"'"' \t\n\r'"'"' < <(gitbrregex $1)) --; }; _gmg'
 # follow specific file through git history
 function gitfollow() {
 	file_path="$1"
@@ -81,7 +83,15 @@ function gitdrb() {
 		done
 	done
 }
-
+# apply prettier formatting to all changed & untracked files
+gitfmt() {
+  IFS=$'\n'
+  for f in $(git diff --name-only HEAD && git ls-files -o --exclude-standard); do
+	  if [ -f "${f}" ]; then
+			prettier --write "$f"
+		fi
+	done
+}
 
 # MEZ
 rsync_send() {
@@ -112,6 +122,7 @@ primsg() {
 groupmsg() {
   curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"message\":\"$1\"}" 'http://localhost:4000/messages/all'
 }
+alias mezlog='vim /home/kikuchio/src/mez/login/src/app/login-form/login-form.component.ts'
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
