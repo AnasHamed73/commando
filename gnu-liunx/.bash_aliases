@@ -87,14 +87,27 @@ function gitdrb() {
 		done
 	done
 }
-# apply prettier formatting to all changed & untracked files
-gitfmt() {
+git_apply_dirty() {
   IFS=$'\n'
   for f in $(git diff --name-only HEAD && git ls-files -o --exclude-standard); do
 	  if [ -f "${f}" ]; then
-			prettier --write "$f"
+			eval "$1" "$f"
 		fi
 	done
+}
+# apply prettier formatting to all changed & untracked files
+gitfmt() {
+  git_apply_dirty "prettier --write"
+}
+gitlint() {
+  #git_apply_dirty "npx eslint --fix"
+	npx eslint --fix .
+}
+gitprep() {
+	echo "formatting..."
+	gitfmt
+	echo -e "\nlinting..."
+	gitlint
 }
 
 # MEZ
