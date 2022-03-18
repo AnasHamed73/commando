@@ -19,6 +19,10 @@ alias chrome='_f(){ google-chrome-stable -U ${1} &>/dev/null; }; _f '
 alias xo='open_all '
 
 # GIT
+# checks out the provided file to the version in the latest local commit
+alias gitch='git checkout HEAD'
+# checks out the master branch
+alias gitcm='git checkout master'
 # fetches a list of the names of the files that were updated in the
 # provided commit hash
 alias gitcf='git diff-tree --no-commit-id --name-only -r '
