@@ -124,7 +124,6 @@ rsync_get() {
 sshp() {
   ssh_host=$1
 }
-alias commitmez='_f(){ git commit -m "MEZ-${1}, MEZ-${2} - ${3}"; }; _f '
 #ssh_host="ec2"
 #ssh_host="biggerguns"
 #ssh_host="bigguns"
@@ -140,6 +139,12 @@ groupmsg() {
   curl -b "$cookies_file" -H "Content-Type: application/json" -X POST -d "{\"message\":\"$1\"}" 'http://localhost:4000/messages/all'
 }
 alias mezlog='vim /home/kikuchio/src/mez/login/src/app/login-form/login-form.component.ts'
+commitmez() {
+	msg="$1"
+	task_id="$(git rev-parse --abbrev-ref HEAD | cut -d '/' -f3)"
+	echo "task id is $task_id"
+	git commit -m "${msg}" -m "refs: ${task_id}"
+}
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
