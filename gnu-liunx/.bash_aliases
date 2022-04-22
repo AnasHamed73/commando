@@ -100,21 +100,22 @@ gitfmt() {
   git_apply_dirty "prettier --write"
 }
 gitlint() {
-  #git_apply_dirty "npx eslint --fix"
-	npx eslint --fix .
+  #DEBUG=eslint:cli-engine git_apply_dirty "npx eslint --fix"
+	DEBUG=eslint:cli-engine npx eslint --fix .
 }
 gitprep() {
-	echo "formatting..."
-	gitfmt
 	echo -e "\nlinting..."
 	gitlint
+	echo "formatting..."
+	gitfmt
 }
 
 # MEZ
 rsync_send() {
   hostname="$1"; shift
-	for f in "$*"; do
-	  rsync -avr --progress "$f" ${hostname}:/home/ubuntu/wireport/"$f"
+	dir="$1"; shift
+	for f in $*; do
+	  rsync -avr --progress "$f" ${hostname}:${dir}/"$f"
 	done
 }
 rsync_get() {
@@ -124,12 +125,16 @@ rsync_get() {
 sshp() {
   ssh_host=$1
 }
+
 #ssh_host="ec2"
 #ssh_host="biggerguns"
 #ssh_host="bigguns"
 ssh_host="mezdev"
+#ssh_host="chetu"
+ssh_dest="/home/ubuntu/wireport"
+
 alias sshmez="ssh $ssh_host"
-alias sendmez="rsync_send $ssh_host "
+alias sendmez="rsync_send $ssh_host $ssh_dest"
 alias fetchmez="rsync_get $ssh_host "
 cookies_file="./cookie_vals.txt"
 primsg() {
@@ -142,9 +147,9 @@ alias mezlog='vim /home/kikuchio/src/mez/login/src/app/login-form/login-form.com
 commitmez() {
 	msg="$1"
 	task_id="$(git rev-parse --abbrev-ref HEAD | cut -d '/' -f3)"
-	echo "task id is $task_id"
 	git commit -m "${msg}" -m "refs: ${task_id}"
 }
+alias mezmock="cd $MEZ_BASE_DIR/helios && npm run start:localMock"
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
