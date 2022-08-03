@@ -23,7 +23,7 @@ function replace () {
   reg="$1"
 	rep="$2"
 	target_dir="$3"
-  for fname in $(find "$target_dir" -mindepth 1); do
+  for fname in $(find "$target_dir" -mindepth 1 -type f); do
 	  if grep -q "$reg" "$fname"; then
 	    vim -c 'set title' -c "%s/${reg}/${rep}/gc" -c 'wq' "$fname";
 		fi
