@@ -18,11 +18,26 @@ alias pycharm='/usr/share/pycharm/pycharm-community-2018.3.4/bin/pycharm.sh &'
 alias chrome='_f(){ google-chrome-stable -U ${1} &>/dev/null; }; _f '
 alias xo='open_all '
 
+# interactive find and replace for all files under a given dir
+function replace () {
+  reg="$1"
+	rep="$2"
+	target_dir="$3"
+  for fname in $(find "$target_dir" -mindepth 1); do
+	  if grep -q "$reg" "$fname"; then
+	    vim -c 'set title' -c "%s/${reg}/${rep}/gc" -c 'wq' "$fname";
+		fi
+	done
+}
+
 # GIT
+alias gitc='git checkout'
 # checks out the provided file to the version in the latest local commit
 alias gitch='git checkout HEAD'
 # checks out the master branch
 alias gitcm='git checkout master'
+# shows the commits on the current branch as compared with master
+alias gitlb='git log master..HEAD'
 # fetches a list of the names of the files that were updated in the
 # provided commit hash
 alias gitcf='git diff-tree --no-commit-id --name-only -r '
@@ -150,6 +165,9 @@ commitmez() {
 	git commit -m "${msg}" -m "refs: ${task_id}"
 }
 alias mezmock="cd $MEZ_BASE_DIR/helios && npm run start:localMock"
+alias mezst='vim ~/think/mez/standup'
+alias mezmongo='docker exec -it mez-mongo bash -c mongo'
+alias mezdbup="cd ${MEZ_BASE_DIR}/mez-build && docker-compose up --detach --no-recreate"
 
 # UB VM
 alias sprsync='_f(){ rsync -avr $1 ahamed@springsteen.cse.buffalo.edu:/home/csgrad/ahamed/basecode; }; _f '
