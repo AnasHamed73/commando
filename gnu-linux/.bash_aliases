@@ -1,5 +1,6 @@
 alias resnet='sudo service network-manager restart'
 
+
 function open_all() {
   for f in $*; do
 		xdg-open ${f}* &>/dev/null
@@ -9,8 +10,21 @@ function open_all() {
 	done
 }
 
+ALIAS_DIR="${HOME}/git-repos/commando/gnu-linux"
+pushalias() {
+ cp ${HOME}/.bash_aliases "$ALIAS_DIR" 
+ pdir="$(pwd)"
+ cd "$ALIAS_DIR"
+ git add .bash_aliases
+ git commit -m "$1"
+ git push
+ cd "$pdir"
+}
+
 #alias vim='vim +"set nohlsearch" +"set number" +"set autoindent" +"set tabstop=2" +"set shiftwidth=2"'
 alias vi='vim'
+alias srcrc='source ~/.bashrc'
+alias balias='vim ~/.bash_aliases'
 alias files='xdg-open . &>/dev/null &'
 alias sublime='/snap/bin/sublime-text.subl'
 alias idea='/usr/share/idea/idea-IC-183.5912.21/bin &'
@@ -165,7 +179,9 @@ commitmez() {
 	git commit -m "${msg}" -m "refs: ${task_id}"
 }
 alias mezmock="cd $MEZ_BASE_DIR/helios && npm run start:localMock"
-alias mezst='vim ~/think/mez/standup'
+function mezst() { 
+  vim +"set nonumber" ~/think/mez/standup
+}
 alias mezmongo='docker exec -it mez-mongo bash -c mongo'
 alias mezdbup="cd ${MEZ_BASE_DIR}/mez-build && docker-compose up --detach --no-recreate"
 
