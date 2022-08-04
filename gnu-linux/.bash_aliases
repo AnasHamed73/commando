@@ -16,8 +16,7 @@ pushalias() {
  pdir="$(pwd)"
  cd "$ALIAS_DIR"
  git add .bash_aliases
- git commit -m "$1"
- git push
+ git commit -m "$1" && git push
  cd "$pdir"
 }
 
