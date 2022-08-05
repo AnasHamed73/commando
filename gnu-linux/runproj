@@ -1,24 +1,30 @@
 #!/bin/bash
-#runproj: run the backend services required to launch the proj site, then run the site
-#Created on 23 July 2020
+# runproj.sh: run the backend services required to launch the proj site, then run the site
+# Created on 23 July 2020
 
-###### CONSTANTS
+ENV_SCRIPT="${PRJ_BASE_DIR}/proj-build/lib/export-env.sh"
+. "${ENV_SCRIPT}"
 
-declare -A SVC_ENDPOINTS=(
-  [S1]='localhost:2001'
-  [S2]='localhost:2002'
-  [S3]='localhost:2003'
-  [S4]='localhost:2004'
+##### CONSTANTS
+
+# services will be run in the order provided here
+# format is: 'SERVICE_NAME','SERVICE_URL','PUT_IN_BACKGROUND_ON_STARTUP'
+SERVICES=(
+  'auth','localhost:3001','y'
+  'resource','localhost:3002','y'
+  'gateway','localhost:3000','y'
+  'login','localhost:4201','y'
+  'messenger','localhost:4000','y'
 )
 
-PROJ_BASE_DIR="${HOME}/src"
-SITE_DIR="site"
+SITE_DIR="helios"
 SITE_URL='localhost:4200'
 LOG_DIR="/tmp"
+PRJ_SSH_CONFIG_FILE="${PRJ_SSH_CONFIG_DIR}/proj_config"
 
 NODE_MAJOR_VERSION="14"
-# names of the backend services (i.e. databases like MongoDB) as identified by systemctl
-BACKEND_SVCS=("mongod" "redis")
+# names of the docker containers that host the backend db servers
+DOCKER_CONTAINERS=("proj-mongo" "proj-redis")
 
 # run the site using the dev configuration
 USE_DEV_CONFIG="false"
@@ -29,202 +35,257 @@ PROMPT_STR="> "
 LOG_SUFFIX="service_log_$(date '+%F-%T')"
 TMP_LOG_FILE="${LOG_DIR}/service_watcher"
 MENU_WIDTH="50"
-
-declare -A SVC_NAMES=()
-
-for service in "${!SVC_ENDPOINTS[@]}"; do
-  service_url="${SVC_ENDPOINTS[$service]}"
-  SVC_NAMES[$service_url]=$service
-done
-SVC_NAMES[$SITE_URL]="${SITE_DIR}"
-
+RUN_INSTALL="false"
 
 SITE_DIR=$(basename "${SITE_DIR}")
 
 ##### FUNCTIONS
 
 usage() {
-	echo "runproj: run the backend services required to launch the proj site, then run the site"
-	echo -e "\nUsage: runproj [-d]"
-	echo -e "\t -d: start the site with the dev configuration (this option is disabled by default)"
+  echo "runproj: run the backend services required to launch the proj site, then run the site"
+  echo -e "\nUsage: runproj -[hidp]"
+  echo -e "\t -i|--install: run npm install on the services & site before starting (disabled by default)"
+  echo -e "\t -p|--pull: do a git pull on the current branch of each of the repositories before installing or running"
+  echo -e "\t -d|--dev: start the site with the dev configuration (disabled by default)"
+  echo -e "\t -h|--help: display help then exit"
+  echo -e "\nEXAMPLE: \"runproj -i -d\" => activates -i option AND -d option "
 }
 
-err() { >&2 echo -ne "\033[0;31m${@}\033[0m"; }
-warn() { echo -ne "\033[1;33m${@}\033[0m"; }
-info() { echo -ne "\033[1;36m${@}\033[0m"; }
-success() { echo -ne "\033[0;32m${@}\033[0m"; }
+err() { echo -ne "\033[0;31m${*}\033[0m"; }
+warn() { echo -ne "\033[1;33m${*}\033[0m"; }
+info() { echo -ne "\033[1;36m${*}\033[0m"; }
+success() { echo -ne "\033[0;32m${*}\033[0m"; }
 
 get_svc_pid() {
-  lsof -t -i :$(cut -f2 -d: <<< "${1}")
+  lsof -t -i :"$(cut -f2 -d: <<< "${1}")"
 }
 
 get_svc_log() {
-	echo -n "${LOG_DIR}/${1}_${LOG_SUFFIX}"
+  echo -n "${LOG_DIR}/${1}_${LOG_SUFFIX}"
 }
 
 get_svc_log_by_num() {
-	svc="$(get_svc_name_by_num $1)"
-	echo -n "$(get_svc_log $svc)"
+  svc="$(get_svc_name_by_num "$1")"
+  echo -n "$(get_svc_log "$svc")"
 }
 
 rm_log() {
-	log="$(get_svc_log $1)"
-	[ -e $log ] && rm $log
+  log="$(get_svc_log "$1")"
+  [ -e "$log" ] && rm "$log"
 }
 
 get_svc_name_by_num() {
-	i=1
-  for service in "${!SVC_ENDPOINTS[@]}"; do
-		[ "${i}" -eq "$1" ] && echo -n "${service}" && return
-		i=$((i+1))
-	done
-	echo -n "${SITE_DIR}"
+  num=$((${1}-1))
+  if [ "${num}" -lt "${#SERVICES[@]}" ]; then
+    svc_name "${SERVICES[$num]}" && return
+  fi
+  echo -n "${SITE_DIR}"
 }
 
-get_svc_url_by_num() {
-	target=$(get_svc_name_by_num $1)
-	echo -n "${SVC_ENDPOINTS[$target]}"
+get_svc_entry_by_num() {
+  num=$((${1}-1))
+  if [ "${num}" -lt "${#SERVICES[@]}" ]; then
+    echo "${SERVICES[$num]}" && return
+  fi
+  echo -n "${SITE_DIR},${SITE_URL}"
+}
+
+extract_field() {
+  svc_entry="$1"
+  field_num="$2"
+  cut -f "$field_num" -d, <<< "$svc_entry"
+}
+
+svc_name() {
+  extract_field "$1" 1
+}
+
+svc_endpoint() {
+  extract_field "$1" 2
+}
+
+svc_background() {
+  extract_field "$1" 3
 }
 
 kill_svc_by_num() {
-	target=$(get_svc_name_by_num $1)
-	[ "$target" = "${SITE_DIR}" ] && svc_url="${SITE_URL}" || svc_url="${SVC_ENDPOINTS[$target]}"
-	if [ "$(svc_process_running ${svc_url}; echo $?)" -ne "0" ]; then
-		warn "$target PROCESS IS ALREADY DOWN" 
-		return 0
-	fi
-	kill_svc_process "$svc_url"
-	info "${target} PROCESS KILLED\n"
+  svc_entry=$(get_svc_entry_by_num "$1")
+  target=$(svc_name "$svc_entry")
+  svc_url="$(svc_endpoint "$svc_entry")"
+
+  if [ "$(svc_process_running "${svc_url}"; echo $?)" -ne "0" ]; then
+    warn "$target PROCESS IS ALREADY DOWN"
+    return 0
+  fi
+  kill_svc_process "$svc_url"
+  info "${target} PROCESS KILLED\n"
 }
 
 restart_all() {
-	info "RESTARTING SERVICES & SITE\n"
-	kill_all && echo && run_all || exit "$?"
+  info "RESTARTING SERVICES & SITE\n"
+  kill_all
+  echo
+  run_all || exit "$?"
 }
 
 restart_site() {
   kill_svc_process "${SITE_URL}" &>/dev/null
-	rm_log "${SITE_DIR}"
+  rm_log "${SITE_DIR}"
   run_site
 }
 
 restart_svc() {
-	target=$(get_svc_name_by_num $1)
-	info "RESTARTING ${target}" && lps
-	if [ "${target}" = "${SITE_DIR}" ]; then
+  svc_entry=$(get_svc_entry_by_num "$1")
+  target=$(svc_name "$svc_entry")
+  if [ "${target}" = "${SITE_DIR}" ]; then
     restart_site && await_site
-	else
-	  run_svc "${target}" &>/dev/null
-	  success "SUCCESS\n"
-	fi
+  else
+    info "RESTARTING ${target}" && lps
+    run_svc "${1}" "n" &>/dev/null
+    success "SUCCESS\n"
+  fi
 }
 
 kill_svc_process() {
-  kill $(get_svc_pid ${1}) &>/dev/null
+  kill -9 $(get_svc_pid "${1}") &>/dev/null
 }
 
 svc_process_running() {
-	[ -z "$(get_svc_pid $1)" ] && return 1 || return 0
+  [ -z "$(get_svc_pid "$1")" ] && return 1 || return 0
 }
 
 kill_node() {
-	service="$1"
-	svc_url="${2}"
-	svc_path="${PROJ_BASE_DIR}/${service}"
-	cd "${svc_path}"
-	info "STOPPING ${service}\n"
-	npm stop &>/dev/null || kill $(get_svc_pid ${svc_url}) &>/dev/null
-	rm_log "$service"
-}
-
-kill_old() {
-	service="$1"
-	service_url="${SVC_ENDPOINTS[$service]}"
-  svc_process_running "$service_url"; up=$?
-	if [ "$up" -eq "0" ]; then
-    warn "ALREADY RUNNNING; RESTARTING" && lps 
-		kill_svc_process "${service_url}"
-	fi
+  service="${1}"
+  svc_url="${2}"
+  svc_path="${PRJ_BASE_DIR}/${service}"
+  cd "${svc_path}"
+  info "STOPPING ${service}\n"
+  kill -9 "$(get_svc_pid "${svc_url}")" &>/dev/null
   rm_log "$service"
 }
 
+kill_old() {
+  service="$1"
+  service_url="$2"
+  svc_process_running "$service_url"; up=$?
+  if [ "$up" -eq "0" ]; then
+    warn "ALREADY RUNNING; RESTARTING" && lps
+    kill_svc_process "${service_url}"
+  fi
+  rm_log "$service"
+}
+
+kill_svcs() {
+  echo
+  for service in "${SERVICES[@]}"; do
+    service_name=$(svc_name "$service")
+    service_url=$(svc_endpoint "$service")
+    kill_node "${service_name}" "${service_url}"
+  done
+}
+
 kill_all() {
-	echo 
-  for service in "${!SVC_ENDPOINTS[@]}"; do
-		kill_node "${service}" "${SVC_ENDPOINTS[$service]}"
-	done
-	kill_node "${SITE_DIR}" "${SITE_URL}"
-	[ -e "$TMP_LOG_FILE" ] && rm "$TMP_LOG_FILE"
+	kill_svcs
+	pkill -f -9 "ng serve"
+  [ -e "$TMP_LOG_FILE" ] && rm "$TMP_LOG_FILE"
 }
 
 kill_all_and_exit() {
-	kill_all
-	exit "$?"
+  cd "$DOCKER_CONTAINERS_DIR" && docker-compose down
+  kill_all
+  exit "$?"
 }
 
 endpoint_up() {
-	health_status="$(curl -s -o /dev/null -w %{http_code} ${1}/health)"
-	if [ "$health_status" -eq "000" -o "$health_status" -eq "404" ]; then
-	  get_status=$(curl -s -o /dev/null -w %{http_code} ${1})
-	  if [ "$get_status" -eq "000" -o "$get_status" -eq "404" ]; then
-		  return 1
-		else
-			return 0
-		fi
-	else
-		return 0
-	fi
+  health_status="$(curl -s -o /dev/null -w %'{'http_code'}' "${1}"/health)"
+  if [ "$health_status" -eq "000" ] || [ "$health_status" -eq "404" ]; then
+    get_status=$(curl -s -o /dev/null -w %'{'http_code'}' "${1}")
+    if [ "$get_status" -eq "000" ] || [ "$get_status" -eq "404" ]; then
+      return 1
+    else
+      return 0
+    fi
+  else
+    return 0
+  fi
 }
 
 start_node() {
-	service="$1"; shift
-	logs="$*"
-  service_path="${PROJ_BASE_DIR}/${service}"
-  cd $service_path 
-	( npm run start &> >(tee -a $(echo $logs)) &) &>/dev/null
+  service="$1"; shift
+  logs="$*"
+  service_path="${PRJ_BASE_DIR}/${service}"
+  cd "$service_path"
+  ( npm run start &> >(tee -a $(echo $logs)) &) &>/dev/null
+}
+
+has_errors() {
+  [ "$(grep -ic "ERR!" "${1}")" != "0" ] && return 0 || return 1
+}
+
+fail_by_error() {
+  service="$1"
+  service_log="$2"
+
+  cat "${service_log}"
+  err "\n\n** FAILED TO START ${service}; LOG IS DISPLAYED ABOVE\n";
+  kill_all_and_exit
 }
 
 run_svc() {
-	service="$1"
-	service_log="$(get_svc_log ${service})"
-  service_url="${SVC_ENDPOINTS[$service]}"
+  svc_entry=$(get_svc_entry_by_num "$1")
+  service=$(svc_name "$svc_entry")
+  service_log="$(get_svc_log "${service}")"
+  service_url=$(svc_endpoint "$svc_entry")
+  run_in_back="$2"
 
-  info "STARTING ${service}" && lps
+  printf "%-40s" "$(info "STARTING ${service}")" | tr ' ' '.' | sed 's/\./ /'
 
-	kill_old "$service"
-	start_node "$service" "${service_log}" "${TMP_LOG_FILE}"
+  kill_old "$service" "$service_url"
+  start_node "$service" "${service_log}" "${TMP_LOG_FILE}"
+  sleep 0.5
 
-	while [ true ]; do
-  	endpoint_up "$service_url"; up=$?
-		if [ "$up" -eq "0" ]; then
-			success "SUCCESS\n"
-			break
-		fi
-		if [ $(grep -ic "ERR!" "${TMP_LOG_FILE}") -ne "0" ]; then
-			cat ${service_log}
-      err "\n\n** FAILED TO START ${service}; LOG IS DISPLAYED ABOVE\n";
-  	  kill_all_and_exit
-    fi
-	done
-	[ -e "$TMP_LOG_FILE" ] && rm "$TMP_LOG_FILE"
+  if [ "$run_in_back" = "y" ]; then
+      has_errors "${TMP_LOG_FILE}" && fail_by_error "${service}" "${service_log}"
+      success "STARTED IN BACKGROUND\n"
+  else
+    while true; do
+      endpoint_up "$service_url"; up=$?
+      if [ "$up" -eq "0" ]; then
+        success "SUCCESS\n"
+        break
+      fi
+      has_errors "${TMP_LOG_FILE}" && fail_by_error "${service}" "${service_log}"
+    done
+  fi
+  [ -e "$TMP_LOG_FILE" ] && rm "$TMP_LOG_FILE"
 }
 
 run_services() {
-  for service in "${!SVC_ENDPOINTS[@]}"; do
-    run_svc "${service}"
+  i=0
+  while [ "$i" -lt "${#SERVICES[@]}" ]; do
+    run_svc "$((i+1))" "$(svc_background "${SERVICES[$i]}")"
+    i=$((i+1))
   done
 }
 
 run_site() {
-	log=$(get_svc_log ${SITE_DIR})
-  cd "${PROJ_BASE_DIR}/${SITE_DIR}"
-	if [ "${USE_DEV_CONFIG}" = "true" ]; then
-		warn "STARTING ${SITE_DIR} WITH DEV CONFIGURATION\n"
-    ng serve -c=dev | tee -a $log &
-	else
-		info "STARTING ${SITE_DIR}\n"
-    ng serve | tee -a $log &
-	fi
+  log=$(get_svc_log "${SITE_DIR}")
+  cd "${PRJ_BASE_DIR}/${SITE_DIR}"
+  config_profile='start:localDev'
+  if [ "${USE_DEV_CONFIG}" = "true" ]; then
+    warn "STARTING ${SITE_DIR} WITH DEV CONFIGURATION\n"
+    config_profile='start:dev'
+  else
+    info "STARTING ${SITE_DIR}\n"
+  fi
+  kill_old "$SITE_DIR" "$SITE_URL" &>/dev/null
+  npm run start:localDev &> >(tee -a "$log") &
+}
+
+restart_svcs() {
+  info "RESTARTING SERVICES\n"
+  kill_svcs
+  run_services || exit "$?"
 }
 
 run_all() {
@@ -233,98 +294,130 @@ run_all() {
 }
 
 ensure_deps() {
-	mongod -version &>/dev/null || { err "MongoDB is not installed. Install then re-run\n"; exit 1; }
-	redis-cli -v &>/dev/null || { err "Redis is not installed. Install then re-run\n"; exit 1; }
-	ng version &>/dev/null || { err "Angular is not installed. Install then re-run\n"; exit 1; }
-	node -v &>/dev/null || { err "Node is not installed. Install then re-run\n"; exit 1; }
-	nv=$(node -v) && nv=$(cut -f1 -d\. <<< ${nv#?})
-	[ "$nv" -lt "$NODE_MAJOR_VERSION" ] && { err "Required major version of node is ${NODE_MAJOR_VERSION}, your version is ${nv}\n"; exit 1; }
+  which curl &>/dev/null || { err "curl is not installed. curl is used to make http requests to make sure services are running."\
+  "install it with 'sudo apt-get install curl'\n"; exit 1; }
+  docker-compose --version &>/dev/null || { err "Docker compose is not installed. Install then re-run\n"; exit 1; }
+  node -v &>/dev/null || { err "Node is not installed. Install then re-run\n"; exit 1; }
+  nv=$(node -v) && nv=$(cut -f1 -d\. <<< "${nv#?}")
+  [ "$nv" -lt "$NODE_MAJOR_VERSION" ] && { err "Required major version of node is ${NODE_MAJOR_VERSION}, your version is ${nv}\n"; exit 1; }
 }
 
 ensure_backend() {
-	for i in ${BACKEND_SVCS}; do
-	  systemctl status --no-pager $i &>/dev/null || { err "$i is not running, try running it with 'systemctl start $i'\n"; exit 1; }
-	done
+  for container in "${DOCKER_CONTAINERS[@]}"; do
+    if [ -z "$(docker ps -a | grep "$container")" ] \
+      || [ "$( docker container inspect -f '{{.State.Running}}' "$container" )" == "false" ]; then
+      cd "$DOCKER_CONTAINERS_DIR" && docker-compose up --detach --no-recreate \
+      || { err "FAILED TO START ${container}\n"  && exit 1; }
+    fi
+  done
+}
+
+ensure_ssh() {
+  proj_ssh_config_file_name="$(basename "${PRJ_SSH_CONFIG_FILE}")"
+  include_stmt="Include $proj_ssh_config_file_name"
+  ssh_dir="${HOME}/.ssh"
+  mkdir -p "$ssh_dir"
+  ssh_config_file="${ssh_dir}/config"
+  if [ ! -s "$ssh_config_file" ]; then
+    info "CREATING SSH CONFIG FILE ${ssh_config_file}\n";
+    echo "${include_stmt}" > "$ssh_config_file"
+  fi
+  if [ -z "$(grep -i "$include_stmt" "$ssh_config_file")" ]; then
+    info "ADDING PRJ CONFIG TO SSH CONFIG FILE ${ssh_config_file}\n";
+    sed -i "1s/^/${include_stmt}\n/" "$ssh_config_file"
+  fi
+  if [ ! -e "${ssh_dir}/${proj_ssh_config_file_name}" ] \
+    || [ "$(diff -s "${ssh_dir}/${proj_ssh_config_file_name}" "$PRJ_SSH_CONFIG_FILE" &>/dev/null; echo $?)" != 0 ]; then
+    cp "$PRJ_SSH_CONFIG_FILE" "$ssh_dir"
+  fi
 }
 
 ensure_dirs() {
-	if [ ! -d "$PROJ_BASE_DIR" ]; then
-		err "project base directory ${PROJ_BASE_DIR}"\
-		"does not exist. Please change it in the CONSTANTS section of this script."\
-		"This is the directory that contains all the proj projects\n"
-		exit 1
-	fi
-  for service in "${!SVC_ENDPOINTS[@]}"; do
-		service_path="${PROJ_BASE_DIR}/${service}"
-	  if [ ! -d "${service_path}" ]; then
-	  	err "Path ${service_path} for service ${service} does not exist."\
-	  	"All the services need to be under ${PROJ_BASE_DIR}."\
-			"Please provide the right directory name in the SVC_ENDPOINTS variable in the CONSTANTS section of this script.\n"
-	  	exit 1
-	  fi
-	done
-	if [ ! -d "${PROJ_BASE_DIR}/${SITE_DIR}" ]; then
-		err "Site directory ${PROJ_BASE_DIR}/${SITE_DIR} does not exist."\
-		"Please change it in the CONSTANTS section of this script.\n"
-		exit 1
-	fi
+  if [ ! -d "$PRJ_BASE_DIR" ]; then
+    err "project base directory ${PRJ_BASE_DIR}"\
+    "does not exist. The PRJ_BASE_DIR variable must be defined to point to the directory"\
+    "that contains all the proj projects before invoking this script.\n"
+    exit 1
+  fi
+  for entry in "${SERVICES[@]}"; do
+    service=$(svc_name "$entry")
+    service_path="${PRJ_BASE_DIR}/${service}"
+    if [ ! -d "${service_path}" ]; then
+      err "Path ${service_path} for service ${service} does not exist."\
+      "All the services need to be under ${PRJ_BASE_DIR}."\
+      "Please provide the right directory name in the SERVICES variable in the CONSTANTS section of this script.\n"
+      exit 1
+    fi
+  done
+  if [ ! -d "${PRJ_BASE_DIR}/${SITE_DIR}" ]; then
+    err "Site directory ${PRJ_BASE_DIR}/${SITE_DIR} does not exist."\
+    "Please change it in the CONSTANTS section of this script.\n"
+    exit 1
+  fi
 }
 
 print_status() {
-	svc_process_running "${1}" && success "RUNNING\n" || err "DOWN\n"
+  svc_process_running "${1}" && success "RUNNING" || err "DOWN"
 }
 
 print_process_statuses() {
-	i=1
-	info "SERVICES:\n"
-  for service in "${!SVC_ENDPOINTS[@]}"; do
-    service_url="${SVC_ENDPOINTS[$service]}"
-		echo -n "${i} - ${service}: "
-    print_status "${service_url}"
-		i=$((i+1))
-	done
-	info "\nSITE:\n"
-  echo -ne "$i - ${SITE_DIR}: " && print_status "${SITE_URL}" echo
+  i=1
+  info "SERVICES:\n"
+  for service_entry in "${SERVICES[@]}"; do
+    service_url="$(svc_endpoint "$service_entry")"
+    service=$(svc_name "$service_entry")
+    printf "%-2s - %-12s: %-20s (branch: %s)\n" "$i" "$service" "$(print_status "${service_url}")" "$(print_branch "$service")"
+    i=$((i+1))
+  done
+  info "\nSITE:\n"
+  printf "%-2s - %-12s: %-20s (branch: %s)\n" "$i" "${SITE_DIR}$([ "$USE_DEV_CONFIG" = "true" ] && warn " (DEV)")" "$(print_status ${SITE_URL})" "$(print_branch "${SITE_DIR}")"
 }
 
 await_site() {
   while [ "$(endpoint_up ${SITE_URL}; echo $?)" -ne "0" ]; do
-  	:
+    :
   done
 }
 
 lps() {
-	echo -n "..."
+  echo -n "..."
 }
 
 show_log() {
-	target=$(get_svc_name_by_num $1)
-	info "\n============ " && echo -n "${target} LOG START" && info " ============\n"
-	cat $(get_svc_log $target)
-	info "============ " && echo -n "${target} LOG END" && info " ============\n\n"
+  target=$(get_svc_name_by_num "$1")
+  info "\n============ " && echo -n "${target} LOG START" && info " ============\n"
+  cat "$(get_svc_log "$target")"
+  info "============ " && echo -n "${target} LOG END" && info " ============\n\n"
 }
 
 follow() {
-	follow_scr="$LOG_DIR/follow"
-  echo 'gnome-terminal --tab -e '"'"'bash -c "printf \"\e]2;'"'"'"$1"'"'"'\a\"; tail -f "'"'"'"$2"' > "$follow_scr"
-  chmod 500 "$follow_scr"
-	"$follow_scr" "$1 log" "$2" &>/dev/null
-	rm -f "$follow_scr"
+  guake_pid=$(pgrep -af guake | cut -d' ' -f1)
+	scr_parent="$(ps -o ppid= $PPID | tr -d ' ')"
+	if [ "$guake_pid" = "$scr_parent" ]; then
+    guake -n 1 && guake -r "$1 log" && guake -e "tail -f -n 1000 $2"
+  else
+    follow_scr="$LOG_DIR/follow"
+    echo 'gnome-terminal --tab -e '"'"'bash -c "printf \"\e]2;'"'"'"$1"'"'"'\a\"; tail -f -n 1000 "'"'"'"$2"' > "$follow_scr"
+    chmod 500 "$follow_scr"
+    "$follow_scr" "$1 log" "$2" &>/dev/null
+    rm -f "$follow_scr"
+  fi
 }
 
 follow_log() {
-	svc=$(get_svc_name_by_num $1)
-  svc_log=$(get_svc_log_by_num $1)
-	info "FOLLOWING $svc LOG IN NEW TAB"
-	follow "$svc" "$svc_log"
+  svc=$(get_svc_name_by_num "$1")
+  svc_log=$(get_svc_log_by_num "$1")
+  info "FOLLOWING $svc LOG IN NEW TAB"
+  follow "$svc" "$svc_log"
 }
 
 follow_all() {
-  for name in "${!SVC_ENDPOINTS[@]}"; do
-		svc_log="$(get_svc_log $name)"
-	  follow "$name" "$svc_log"
-	done
-	follow "${SITE_DIR}" "$(get_svc_log ${SITE_DIR})"
+  for entry in "${SERVICES[@]}"; do
+    name=$(svc_name "$entry")
+    svc_log="$(get_svc_log "$name")"
+    follow "$name" "$svc_log"
+  done
+  follow "${SITE_DIR}" "$(get_svc_log "${SITE_DIR}")"
 }
 
 parse_num() {
@@ -332,42 +425,42 @@ parse_num() {
 }
 
 print_menu_row() {
-	info " |" && printf "%-${2}s" "${1}" && info "|\n"
+  info " |" && printf "%-${2}s" "${1}" && info "|\n"
 }
 
 print_menu_row_std() {
-	print_menu_row "${1}" "${MENU_WIDTH}"
+  print_menu_row "${1}" "${MENU_WIDTH}"
 }
 
 print_menu_header() {
-	info "  ____________________" && echo -n "OPTIONS" && info " ______________________ \n"
+  info "  ____________________" && echo -n "OPTIONS" && info "_______________________ \n"
 }
 
 print_menu_footer() {
-	info " *__________________________________________________*\n"
+  info " *__________________________________________________*\n"
 }
 
 print_options() {
-	width="50"
   print_menu_header
   print_short_menu_opts
   print_menu_footer
 }
 
 print_short_menu_opts() {
-	print_menu_row_std "ls: show status of services"
-	print_menu_row_std "r: restart all services & site"
+  print_menu_row_std "ls: show status of services"
+  print_menu_row_std "r: restart all services & site"
   print_menu_row_std "r {N}: start/restart service number {N}"
-	print_menu_row_std "f {N|*}: follow log for service {N} or all {*}"
+  print_menu_row_std "rs: start/restart services only"
+  print_menu_row_std "f {N|*}: follow log for service {N} or all {*}"
   print_menu_row_std "k {N}: kill service number {N}"
-	print_menu_row_std "log {N}: show log for service {N}"
-	print_menu_row_std "o: show all options"
+  print_menu_row_std "log {N}: show log for service {N}"
+  print_menu_row_std "o: show all options"
 }
 
 print_long_menu_opts() {
   print_menu_header
   print_short_menu_opts
-	print_menu_row_std "q: kill all services & site, then quit"
+  print_menu_row_std "q: kill all services & site, then quit"
   print_menu_row_std "clear|cls: clear screen & print options"
   print_menu_row_std "less {N}: show log for service {N} using less"
   print_menu_row_std "vim {N}: show log for service {N} using vim"
@@ -377,20 +470,77 @@ print_long_menu_opts() {
   print_menu_footer
 }
 
+npm_install() {
+  info "\n== INSTALLING ${1} ==\n"
+  cd "${PRJ_BASE_DIR}/${1}"
+  npm install || { err "FAILED TO INSTALL ${1}\n"; exit 1; }
+}
+
+install_all() {
+  for entry in "${SERVICES[@]}"; do
+    svc=$(svc_name "$entry")
+    npm_install "$svc"
+  done
+  npm_install "${SITE_DIR}"
+  success "\nINSTALLATION COMPLETE\n\n"
+}
+
+print_branch() {
+  svc_dir="${PRJ_BASE_DIR}/${1}"
+  old_pwd=$(pwd)
+  cd "$svc_dir"
+  git rev-parse --abbrev-ref HEAD
+  cd "$old_pwd"
+}
+
+pull_latest() {
+  svc_dir="$1"
+  svc_name="$(basename "$svc_dir")"
+  old_pwd=$(pwd)
+  cd "$svc_dir"
+  info "\n== PULLING ${svc_name} (branch: $(print_branch "$svc_name")) ==\n"
+  git pull || { err "** FAILED TO PULL LATEST CHANGES FOR ${svc_name}\n"; kill_all_and_exit; }
+  cd "$old_pwd"
+}
+
+pull_all() {
+  for entry in "${SERVICES[@]}"; do
+    svc=$(svc_name "$entry")
+    pull_latest "${PRJ_BASE_DIR}/${svc}"
+  done
+  pull_latest "${PRJ_BASE_DIR}/${SITE_DIR}"
+  success "\nPULL SUCCESSFUL\n\n"
+}
+
 ###### MAIN
 
 trap kill_all_and_exit SIGINT SIGTERM SIGHUP
 
-case "$1" in
-	"--help")
-		usage 
-  	exit 0
-    ;;
-	"-d")
-		warn "Using dev configuration for ${SITE_DIR}\n"
-		USE_DEV_CONFIG=true
-		;;
-esac
+while [ -n "$1" ]; do
+  case "$1" in
+    "-d"|"--dev")
+      warn "USING DEV CONFIGURATION FOR ${SITE_DIR}\n"
+      USE_DEV_CONFIG="true"
+      shift
+      ;;
+    "-i"|"--install")
+      RUN_INSTALL="true"
+      shift
+      ;;
+    "-p"|"--pull")
+      PULL="true"
+      shift
+      ;;
+    "-h"|"--help")
+      usage
+      exit 0
+      ;;
+    *)
+      err "unrecognized option: ${1}\n"
+      usage
+      exit 1
+  esac
+done
 
 ensure_dirs
 
@@ -398,7 +548,13 @@ ensure_deps
 
 ensure_backend
 
+ensure_ssh
+
+[ "${PULL}" == "true" ] && pull_all
+
 rm "$TMP_LOG_FILE" &>/dev/null
+
+[ "${RUN_INSTALL}" = "true" ] && install_all
 
 run_all || exit "$?"
 
@@ -407,60 +563,63 @@ await_site
 
 print_process_statuses
 
-while [ true ]; do
-  echo 
-	print_options
-  read -p"${PROMPT_STR}" 
+while true; do
+  echo
+  print_options
+  read -p"${PROMPT_STR}"
   case "${REPLY}" in
-  	log*[0-9])
-			show_log $(parse_num ${REPLY})
-  		;;
-		r*[0-9])
-			restart_svc $(parse_num ${REPLY})
-			;;
-		k*[0-9])
-      kill_svc_by_num $(parse_num ${REPLY})
-			;;
-  	"ls"|"l"|"")
-			print_process_statuses
-  		;;
-		r*)
-			restart_all && await_site
-			;;
-		q)
-			echo "Exiting" && lps
+    log*[0-9])
+      show_log "$(parse_num "${REPLY}")"
+      ;;
+    r*[0-9])
+      restart_svc "$(parse_num "${REPLY}")"
+      ;;
+    k*[0-9])
+      kill_svc_by_num "$(parse_num "${REPLY}")"
+      ;;
+    "ls"|"l"|"")
+      print_process_statuses
+      ;;
+    rs*)
+      ensure_backend
+      restart_svcs
+      ;;
+    r*)
+      restart_all && await_site
+      ;;
+    q)
+      echo -n "Exiting" && lps
       kill_all_and_exit
-			;;
-		o)
-     print_long_menu_opts 
-			;;
-		"clear"|"cls")
-			clear
-			;;
-  	less*[0-9])
-			less $(get_svc_log_by_num $(parse_num ${REPLY}))
-  		;;
-  	vim*[0-9])
-			vim $(get_svc_log_by_num $(parse_num ${REPLY}))
-  		;;
-  	code*[0-9])
-			code $(get_svc_log_by_num $(parse_num ${REPLY}))
-  		;;
-  	gedit*[0-9])
-			gedit $(get_svc_log_by_num $(parse_num ${REPLY}))
-  		;;
-  	cat*[0-9])
-			show_log $(parse_num ${REPLY})
-  		;;
-  	f*[0-9])
-			follow_log "$(parse_num ${REPLY})" 
-  		;;
-		f*\*)
-			follow_all
-			;;
-		*) 
-			echo "Let's try that again"
-			;;
+      ;;
+    o)
+     print_long_menu_opts
+      ;;
+    "clear"|"cls")
+      clear
+      ;;
+    less*[0-9])
+      less "$(get_svc_log_by_num "$(parse_num "${REPLY}")")"
+      ;;
+    vim*[0-9])
+      vim "$(get_svc_log_by_num "$(parse_num "${REPLY}")")"
+      ;;
+    code*[0-9])
+      code "$(get_svc_log_by_num "$(parse_num "${REPLY}")")"
+      ;;
+    gedit*[0-9])
+      gedit "$(get_svc_log_by_num "$(parse_num "${REPLY}")")"
+      ;;
+    cat*[0-9])
+      show_log "$(parse_num "${REPLY}")"
+      ;;
+    f*[0-9])
+      follow_log "$(parse_num "${REPLY}")"
+      ;;
+    f*\*)
+      follow_all
+      ;;
+    *)
+      echo "Let's try that again"
+      ;;
   esac
 done
-
