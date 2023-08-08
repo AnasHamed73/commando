@@ -1,0 +1,33 @@
+#!/bin/bash
+#tangodbscr
+#Created on 15 February 2023
+######CONSTANTS
+#####FUNCTIONS
+usage() {
+	echo "tangodbscr: (description)"
+	echo -e "\nUsage: tangodbscr"
+}
+clean_up() {
+	exit 0
+}
+######MAIN
+trap clean_up SIGINT SIGTERM SIGHUP
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+if [ -z "$1" ]; then
+	echo "provide the ip address of the node"
+  return 1	
+fi
+ip_add="$1"
+
+ssh -tt $ip_add <<- EOF1
+	sudo su -
+	cd /home/azure-user/bin
+	./tangodbscr
+EOF1
+

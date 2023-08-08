@@ -1,0 +1,94 @@
+#!/bin/bash
+# arxbuilds: runs scripts that produce useful active-active data about the latest CI builds
+
+######CONSTANTS
+
+WORK_DIR="${HOME}/builds/archive"
+SUPPORTED_BUILD_TYPES=("FS" "CO" "RS")
+DBDIFF="${HOME}/bin/dbdiff"
+DBDELTA="${HOME}/bin/dbdelta"
+TAR_NAME=data.tar.gz
+
+#####FUNCTIONS
+
+usage() {
+  echo "arxbuilds: runs scripts that produce useful active-active data about the latest CI builds"
+  echo -e "\nUsage: arxbuilds"
+}
+
+clean_up() {
+  exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+  "--help")
+    usage 
+    exit 0
+    ;;
+esac
+
+for build_type in ${SUPPORTED_BUILD_TYPES[*]}; do
+  run_dbdelta=true
+  run_dbdiff=true
+  meta_url="https://cas-jenkins-p1.pontus.lab.emc.com/job/${build_type}_-_Build_and_Metal_Testing_Pipeline/lastBuild/api/json"
+  tmp_meta_file="$(mktemp -p /tmp)"
+  wget "$meta_url" -O "$tmp_meta_file" &> /dev/null
+  build_num=$(grep -o "\"number\":[0-9]*" "$tmp_meta_file" \
+    | head -1 \
+    | cut -d : -f 2)
+  if [ -n "$build_num" ]; then
+    build_dir="${WORK_DIR}/${build_type}-${build_num}"
+    dbdiff_log="$build_dir/dbdiff_log"
+    dbdelta_log="$build_dir/dbdelta_log"
+    meta_file="${build_dir}/build_metadata.json"
+
+    if [ -e "$build_dir/$TAR_NAME" ] \
+      && [ -n "$(tar tf ${build_dir}/$TAR_NAME \
+      | grep '*delta/.*.csv')" ]; then
+      run_dbdelta=false
+    fi
+    if [ -e "$build_dir/$TAR_NAME" ] \
+      && [ -n "$(tar tf ${build_dir}/$TAR_NAME \
+      | grep '*diff/.*.txt')" ]; then
+      run_dbdiff=false
+    fi
+
+    mkdir -p "$build_dir"
+    mv "$tmp_meta_file" "$meta_file"
+
+    if [ "$run_dbdiff" = "true" ]; then
+      [ -e "$dbdiff_log" ] && rm "$dbdiff_log"
+      "$DBDIFF" \
+        -d "$WORK_DIR" \
+      "$build_type" "$build_num" >> "$dbdiff_log"
+    fi
+    if [ "$run_dbdelta" = "true" ]; then
+      [ -e "$dbdelta_log" ] && rm "$dbdelta_log"
+      "$DBDELTA" \
+        -d "$WORK_DIR" \
+        -s \
+        "$build_type" "$build_num" >> "$dbdelta_log"
+    fi
+
+    if [ -e "$build_dir" ]; then
+      if [ "$run_dbdiff" = "true" ] \
+	|| [ "$run_dbdelta" = "true" ]; then
+        cd "$build_dir"
+        [ -e "$TAR_NAME" ] \
+          && tar -zxf "$TAR_NAME" \
+          && rm "$TAR_NAME"
+        tar -zcf "$TAR_NAME" $(ls) \
+          && ls . \
+          | grep -v "$TAR_NAME" \
+          | xargs rm -r
+      fi
+    fi
+  fi
+done
+
+clean_up
+

@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#####FUNCTIONS
+
+usage() {
+	echo "convj: replace some TestNG-specific annotations and statements with their JUnit equivalent"
+	echo -e "\nUsage: convj [WORK_DIR]"
+}
+
+clean_up() {
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+if [ -z "$1" ]; then
+	echo "please specify the directory containing the files to convert"
+	usage
+	exit 1
+fi
+
+if [ ! -e "$1" ]; then
+	echo "$1 does not exist"
+	exit 1
+fi
+	
+for file in $(find "$1" -name *.java); do
+  sed -i \
+	  -e 's/import org\.testng\.annotations\.BeforeClass/import org\.junit\.jupiter\.api\.BeforeAll/g'  \
+	  -e 's/import org\.testng\.Assert/import org\.junit\.jupiter\.api\.Assertions/g'  \
+    -e 's/import org\.testng\.annotations\.AfterClass/import org\.junit\.jupiter\.api\.AfterAll/g'  \
+    -e 's/import org\.testng\.annotations\.BeforeMethod/import org\.junit\.jupiter\.api\.BeforeEach/g'  \
+    -e 's/import org\.testng\.annotations\.AfterMethod/import org\.junit\.jupiter\.api\.AfterEach/g'  \
+	  -e 's/import org\.testng\.annotations\.Test/import org\.junit\.jupiter\.api\.Test/g'  \
+    -e 's/\(\s\+\)@BeforeClass(groups \?= \?{ \?\"\(.*\)\" \?})/\1@BeforeAll\n\1@Tag(\"\2\")/g'  \
+    -e 's/\(\s\+\)@BeforeClass(groups \?= \?{ \?\"\(.*\)\" \?}\, alwaysRun = true)/\1@BeforeAll\n\1@Tag(\"\2\")/g'  \
+    -e 's/@BeforeClass$/@BeforeAll/g'  \
+    -e 's/\(\s\+\)@AfterClass(groups \?= \?{ \?\"\(.*\)\" \?})/\1@AfterAll\n\1@Tag(\"\2\")/g'  \
+    -e 's/\(\s\+\)@AfterClass(groups \?= \?{ \?\"\(.*\)\" \?}\, alwaysRun = true)/\1@AfterAll\n\1@Tag(\"\2\")/g'  \
+    -e 's/@AfterClass$/@AfterAll/g'  \
+    -e 's/\(\s\+\)@BeforeMethod(groups \?= \?{ \?\"\(.*\)\" \?})/\1@BeforeEach\n\1@Tag(\"\2\")/g'  \
+    -e 's/\(\s\+\)@BeforeMethod(groups \?= \?{ \?\"\(.*\)\" \?}\, alwaysRun = true)/\1@BeforeEach\n\1@Tag(\"\2\")/g'  \
+    -e 's/@BeforeMethod$/@BeforeEach/g'  \
+    -e 's/\(\s\+\)@AfterMethod(groups \?= \?{ \?\"\(.*\)\" \?})/\1@AfterEach\n\1@Tag(\"\2\")/g'  \
+    -e 's/\(\s\+\)@AfterMethod(groups \?= \?{ \?\"\(.*\)\" \?}\, alwaysRun = true)/\1@AfterEach\n\1@Tag(\"\2\")/g'  \
+    -e 's/@AfterMethod$/@AfterEach/g'  \
+    -e 's/\(\s\+\)@Test( \?groups \?= \?{ \?\"\([a-zA-Z0-9]*\)\" \?})/\1@Test\n\1@Tag(\"\2\")/g' \
+	  -e 's/Assert\./Assertions\./g' "$file"
+
+	if grep -q "@Tag" "$file" && ! grep -q "import org.junit.jupiter.api.Tag;" "$file"; then
+		line_num=$(grep -n -m 1 "import org.junit" "$file" | sed 's/\([0-9]*\).*/\1/')
+		if [ -z $line_num ]; then
+		  line_num=$(grep -n -m 1 "import" "$file" | sed 's/\([0-9]*\).*/\1/')
+		fi
+	  sed -i "$line_num i import org.junit.jupiter.api.Tag;" "$file"
+	fi
+done
+

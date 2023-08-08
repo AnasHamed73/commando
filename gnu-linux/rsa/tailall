@@ -1,0 +1,90 @@
+#!/bin/bash
+#tailall: tail all CAS & Symplified processes
+
+######CONSTANTS
+
+TMP_RC="/tmp/tailrc"
+GIT_ROOT="${HOME}/git"
+TAIL_ALIASES="${GIT_ROOT}/tango/BuildTools/LinuxMint/bin/.alias"
+
+# names assigned to the tabs of the services
+BE_DISP="tail-be"
+FE_DISP="tail-fe"
+AD_DISP="tail-ad"
+CO_DISP="tail-co"
+CARMA_DISP="tail-carma"
+SYM_DISP="tail-symplified"
+SYM_TC_DISP="tail-sym_tomcat"
+
+declare -A TAIL_CMDS
+TAIL_CMDS[$BE_DISP]="tail_be"
+TAIL_CMDS[$FE_DISP]="tail_fe"
+TAIL_CMDS[$AD_DISP]="tail_ad"
+TAIL_CMDS[$CO_DISP]="tail_co"
+TAIL_CMDS[$SYM_DISP]="tail_sy"
+TAIL_CMDS[$SYM_TC_DISP]="tail_st"
+# TODO: figure out how to handle carma pods
+#TAIL_CMDS[$CARMA_DISP]="tail_ca"
+
+SYM_LOGS=("$AD_DISP" "$CO_DISP" "$SYM_DISP" "$SYM_TC_DISP")
+NGX_LOGS=("$BE_DISP" "$FE_DISP")
+
+#####FUNCTIONS
+
+usage() {
+  echo "tailall: tail all CAS & Symplified processes"
+  echo -e "\nUsage: tailall [POD_NAME]"
+  echo -e "\n\tPOD_NAME: (optional) the shorthand name of the karma pod (e.g. gp3). If POD_NAME is not provided, then localhost is assumed"
+}
+
+clean_up() {
+  rm $TMP_RC
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+  "--help")
+    usage 
+    exit 0
+    ;;
+esac
+
+term_args="gnome-terminal --maximize"
+#term_args="xfce4-terminal"
+for tabname in ${!TAIL_CMDS[*]}; do
+  cat > "$TMP_RC" <<- EOF
+    source ${HOME}/.bashrc $TAIL_ALIASES
+    
+    tail_sy() {
+      if [ -z "\$1" ]; then
+        tailsy;
+      else
+        ssh_ad \$1 sudo -u ssouser bash -ic "tail -f /var/log/symplified/symplified.log";
+      fi
+    }
+    
+    tail_st() {
+      if [ -z "\$1" ]; then
+        tailst;
+      else
+        ssh_ad \$1 sudo -u ssouser bash -ic "tail -f /var/log/symplified/catalina.out";
+      fi
+    }
+EOF
+  # NOTE: the tail_* scripts do not account for pods on dev3-west
+  region=$2
+  if [[ "${SYM_LOGS[*]}" =~ "$tabname" ]] && [ ! -z "$1" ]; then
+    tail_arg=karma-${1}-${region:=east}-sym
+  elif [[ "${NGX_LOGS[*]}" =~ "$tabname" ]] && [ ! -z "$1" ]; then
+    tail_arg=karma-${1}-${region:=east}-ngx
+  fi
+  term_args="$term_args --tab --title=$tabname -e \"bash -c 'source $TMP_RC; ${TAIL_CMDS[$tabname]} $tail_arg'\""
+done
+
+bash -c "$term_args" &>/dev/null
+
+clean_up
+

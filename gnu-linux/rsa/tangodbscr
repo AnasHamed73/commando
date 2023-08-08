@@ -1,0 +1,67 @@
+#!/bin/bash
+#tangodbscr
+#Created on 15 February 2023
+######CONSTANTS
+#####FUNCTIONS
+usage() {
+	echo "tangodbscr: (description)"
+	echo -e "\nUsage: tangodbscr"
+}
+clean_up() {
+	exit 0
+}
+######MAIN
+trap clean_up SIGINT SIGTERM SIGHUP
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+if [ -z "$1" ]; then
+	echo "provide the ip address of the node"
+  return 1	
+fi
+ip_add="$1"
+
+#ssh -tt $ip_add > /tmp/tf <<- 'EOF1'
+#	sudo su -
+#	mysqlParameters=`echo dev3 | sstool -a VIEW_ALL | grep -e install.db.user -e install.db.password -e install.db.hostname | paste - - - | sed 's/install.db.user =>/ -u/; s/install.db.password => / -p/; s/install.db.hostname => / PARAM_DELIM -h /; s/$/  --ssl-ca=\/usr\/local\/symplified\/shared\/MANAGED_MYSQL_CERT_PEM_FILE.pem/;'`
+#  echo "$mysqlParameters"
+#	exit
+#	exit
+#EOF1
+
+
+ssh -tt $ip_add > /tmp/tf <<- 'EOF1'
+	echo dev3 | sudo /usr/local/symplified/admin/securestoretool.sh -a VIEW_ALL | grep -e install.db.user -e install.db.password -e install.db.hostname | paste - - - | sed 's/install.db.user =>/ -u/; s/install.db.password => / -p/; s/install.db.hostname => / PARAM_DELIM -h /; s/$/  --ssl-ca=\/usr\/local\/symplified\/shared\/MANAGED_MYSQL_CERT_PEM_FILE.pem/;'
+	exit
+EOF1
+
+
+
+#mysql_params="$(cat /tmp/tf | grep PARAM_DELIM)"
+mysql_params="$(cat /tmp/tf | grep PARAM_DELIM | tail -1 | awk -F PARAM_DELIM '{print $2}')"
+
+echo "ssh $ip_add && sudo mysql -p singlepoint_stack1 $mysql_params"
+
+
+#ssh -tt $ip_add <<- EOF
+#  sudo su -
+#	mysql "$mysql_params"
+#EOF
+#ssh -t $ip_add sudo mysql "$mysql_params" -p singlepoint_stack1
+
+
+#scr=$( cat <<- EOF
+#  sudo mysql $mysql_params
+#	EOF
+#)
+
+scr=$( cat <<- EOF
+  vim  myfile
+	EOF
+)
+ssh -t $ip_add "${scr}"
+

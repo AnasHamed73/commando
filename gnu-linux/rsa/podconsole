@@ -1,0 +1,77 @@
+#!/bin/bash
+# podconsole: download console log of specified build of specified pod and open it in an editor 
+
+######CONSTANTS
+
+WORK_DIR=/tmp
+EDITOR="vim"
+
+SUPPORTED_BUILD_TYPES=("FS" "CO" "RS" $(echo GP{1..9}))
+
+#####FUNCTIONS
+
+usage() {
+  echo "podconsole: download console log of specified build of specified pod and open it in an editor "
+  echo -e "Usage: podconsole [BUILD_TYPE] [BUILD_NUM]"
+  echo -e "\t[BUILD_TYPE]: the build type to use (case insensitive). ex: 'GP3' or 'FS'"
+  echo -e "\t[BUILD_NUM] (optional) : the build number. ex: 10245. If not specified, will use last build"
+}
+
+clean_up() {
+  exit 0
+}
+
+get_log_url() {
+  build_type="$1"
+  build_num="$2"
+  if grep -q "GP" <<< "$build_type"; then
+    url="https://via-jenkins.pontus.lab.emc.com/view/Team/view/KARMA/view/ARTStyle-General-Purpose-Jobs/job/Karma-${build_type}-Build_and_Metal_Testing_Pipeline/$build_num/consoleText"
+  elif grep -Eq "FS|CO|RS" <<< "$build_type"; then
+    url="https://cas-jenkins-p1.pontus.lab.emc.com/job/${build_type}_-_Build_and_Metal_Testing_Pipeline/${build_num}/consoleText"
+  fi
+  echo "$url"
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+  "--help")
+    usage 
+    exit 0
+    ;;
+esac
+
+build_type="${1^^}"
+build_num="$2"
+
+if [[ ! "${SUPPORTED_BUILD_TYPES[*]}" =~ "$build_type" ]]; then
+  echo "Build type must be one of [${SUPPORTED_BUILD_TYPES[@]}] (case insensitive)."
+  exit 1
+fi
+
+if [ -z "$build_num" ]; then
+  build_num="lastBuild"
+fi
+
+log_file_url="$(get_log_url $build_type $build_num)"
+log_file_name="${build_type}_${build_num}_console_log.txt"
+log_file_path="$WORK_DIR"/"$log_file_name"
+
+echo "fetching log file $log_file_url"
+wget -q "$log_file_url" -O "$log_file_path" || { echo "build not found"; exit 1; }
+
+# rename file to contain the build number which can be pulled from the log file once downloaded
+if [ "$build_num" = "lastBuild" ]; then
+  new_build_num=$(grep -o "BUILD_NUMBER=[0-9]*" "$log_file_path" \
+    | head -1 \
+    | cut -d = -f 2)
+  new_log_file_name="${build_type}_${new_build_num}_console_log.txt"
+  new_log_file_path="$WORK_DIR"/"$new_log_file_name"
+  mv "$log_file_path" "$new_log_file_path"
+  log_file_path="$new_log_file_path"
+fi
+
+[ -e "$log_file_path" ] && "$EDITOR" "$log_file_path"
+

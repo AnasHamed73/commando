@@ -1,0 +1,34 @@
+#!/bin/bash
+#tangodt
+#Created on 10 March 2023
+
+######CONSTANTS
+local_port=18068
+remote_port=8068
+
+#####FUNCTIONS
+usage() {
+	echo "tangodt: (description)"
+	echo -e "\nUsage: tangodt"
+}
+clean_up() {
+	exit 0
+}
+######MAIN
+trap clean_up SIGINT SIGTERM SIGHUP
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+	
+if [ -z "$1" ]; then
+  echo "provide the ip address of the node"
+  return 1
+fi
+ip_add="$1"
+ssh -L ${local_port}:${ip_add}:${remote_port} -i ~/.ssh/azure_ops_dev3.pem azure-user@${ip_add} <<- EOF
+  sudo su -
+  tail -f /var/log/rsa/securidaccess/admin/admin.log 
+EOF

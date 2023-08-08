@@ -1,0 +1,32 @@
+#!/bin/bash
+#ngxtail
+#Created on 10 March 2023
+######CONSTANTS
+#####FUNCTIONS
+usage() {
+	echo "ngxtail: (description)"
+	echo -e "\nUsage: ngxtail"
+}
+clean_up() {
+	exit 0
+}
+######MAIN
+trap clean_up SIGINT SIGTERM SIGHUP
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+
+if [ -z "$1" ]; then
+	echo "provide the ip address of the node"
+  return 1	
+fi
+ip_add="$1"
+
+ssh $ip_add <<- EOF
+  sudo tail -f /var/log/rsa/securidaccess/ngx-be/ngx-be.log
+EOF
+	

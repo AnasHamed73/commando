@@ -1,0 +1,67 @@
+#!/bin/bash
+# psmarts: patch the local smarts properties file from the one in the artifacts of the specified build for the specified team pod
+
+######CONSTANTS
+
+WORK_DIR=/tmp
+LOCAL_SMARTS_FILE_PATH="${HOME}/git/SMARTS/ConfigResources/testConfig/smarts-workflow.properties"
+
+#####FUNCTIONS
+
+usage() {
+	echo "psmarts: patch the local smarts properties file from the one in the artifacts of the specified build for the specified team pod"
+	echo -e "Usage: psmarts [TEAM_POD] [BUILD_NUM]"
+	echo -e "\t[TEAM_POD]: the team pod to use (case insensitive). ex: GP3"
+	echo -e "\t[BUILD_NUM] (optional) : the build number. ex: 10245"
+}
+
+rm_props_file() {
+  [ -e "$props_file_path" ] && rm "$props_file_path"
+}
+
+clean_up() {
+  rm_props_file
+	exit 0
+}
+
+######MAIN
+
+trap clean_up SIGINT SIGTERM SIGHUP
+
+case "$1" in
+	"--help")
+					usage 
+					exit 0
+					;;
+esac
+
+karma_pod="${1^^}"
+build_id="$2"
+
+if [ -z "$karma_pod" ]; then
+	echo "Please specify karma pod."
+	usage
+	exit 1
+fi
+
+if [ -z "$build_id" ]; then
+	build_id="lastSuccessfulBuild"
+fi
+
+artifacts_url="https://via-jenkins.pontus.lab.emc.com/view/Team/view/KARMA/view/ARTStyle-General-Purpose-Jobs/job/Karma-${karma_pod}-Build_and_Metal_Testing_Pipeline/${build_id}/artifact"
+props_file_name="smarts-workflow_voyager-karma-${karma_pod,,}-ngx.properties"
+props_file_url="$artifacts_url"/"$props_file_name"
+props_file_path="$WORK_DIR"/"$props_file_name"
+
+rm_props_file
+
+echo "fetching props file $props_file_url"
+wget -q "$props_file_url" -O "$props_file_path" || { echo "properties file not found"; exit 1; }
+[ -e "$props_file_path" ] && cat "$props_file_path" > "$LOCAL_SMARTS_FILE_PATH"
+
+build_log_suffix="build #$build_id"
+if [ $build_id = "lastSuccessfulBuild" ]; then
+  build_log_suffix=$build_id
+fi
+echo "local SMARTS properties file successfully updated from $karma_pod $build_log_suffix"
+rm_props_file
