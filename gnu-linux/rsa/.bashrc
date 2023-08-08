@@ -236,8 +236,6 @@ function lessco() { less /var/log/rsa/securidaccess/controller/controller.log; }
 function lessst() { less /var/log/symplified/catalina.out; }
 function lesssy() { less /var/log/symplified/symplified.log; }
 
-export DEVOPS_USER=anas.hamed
-export DEVOPS_PASSWORD=UdvK9gvTSeUl
 alias resnet='sudo service network-manager restart'
 
 # GIT
